@@ -82,7 +82,30 @@ function nowHM() { const d = new Date(); return d.toTimeString().slice(0, 5); }
 function fmtDate(iso) { const d = new Date(iso + "T00:00:00"); return d.toLocaleDateString("pt-BR", { day: "2-digit", month: "short" }); }
 function monthYear(iso) { if (!iso)
     return ""; const d = new Date(iso + "T00:00:00"); return d.toLocaleDateString("pt-BR", { month: "short", year: "numeric" }); }
-function sum(arr) { return arr.reduce((a, b) => a + b, 0); }
+function sum(arr) { return arr.reduce((a, b) => a + (Number(b) || 0), 0); }
+/* Formatação de números e moeda */
+const CURRENCIES = {
+    BRL: { code: "BRL", locale: "pt-BR", label: "Real (R$)" },
+    USD: { code: "USD", locale: "en-US", label: "Dólar (US$)" },
+    EUR: { code: "EUR", locale: "de-DE", label: "Euro (€)" },
+};
+let ACTIVE_CURRENCY = "BRL";
+function money(v, currency) {
+    const cur = CURRENCIES[currency || ACTIVE_CURRENCY] || CURRENCIES.BRL;
+    const n = Number(v) || 0;
+    return n.toLocaleString(cur.locale, { style: "currency", currency: cur.code });
+}
+function num(v, casas = 0) {
+    const n = Number(v) || 0;
+    return n.toLocaleString("pt-BR", { minimumFractionDigits: casas, maximumFractionDigits: casas });
+}
+function qty(v) {
+    const n = Number(v) || 0;
+    // cripto pode ter frações muito pequenas (0.00014 BTC)
+    if (n !== 0 && Math.abs(n) < 1)
+        return n.toLocaleString("pt-BR", { maximumFractionDigits: 8 });
+    return n.toLocaleString("pt-BR", { maximumFractionDigits: 2 });
+}
 function inPeriod(dateIso, period) {
     if (!dateIso)
         return false;
@@ -107,17 +130,18 @@ function inPeriod(dateIso, period) {
 /* DADOS DEMONSTRATIVOS (fictícios)                                     */
 /* ------------------------------------------------------------------ */
 const initialData = {
+    currency: "BRL",
     dashboardConfig: {
         leitura: true, exercicio: true, sono: false, peso: false, pressao: false,
         livros: true, estado: false, financeiro: true, doacaoModo: "contagem",
     },
-    profile: { nome: "Beatriz Andrade", dataNascimento: "1994-03-12", telefone: "(21) 99999-0000", email: "beatriz@example.com" },
+    profile: { nome: "Beatriz Andrade", cargo: "Analista Administrativa", dataNascimento: "1994-03-12", telefone: "(21) 99999-0000", email: "beatriz@example.com", cidade: "Niterói, RJ", resumo: "Profissional de administração com foco em processos e análise de dados. Em formação continuada por conta própria." },
     books: [
         { id: 1, title: "Hábitos Atômicos", author: "James Clear", tema: "Desenvolvimento pessoal", totalPages: 320, pagesRead: 208, status: "lendo" },
         { id: 2, title: "Sapiens", author: "Yuval Noah Harari", tema: "História", totalPages: 464, pagesRead: 464, status: "concluído", dataConclusao: isoDaysAgo(45) },
         { id: 3, title: "O Poder do Hábito", author: "Charles Duhigg", tema: "Desenvolvimento pessoal", totalPages: 408, pagesRead: 408, status: "concluído", dataConclusao: isoDaysAgo(120) },
     ],
-    reading: [26, 18, 0, 32, 24, 12, 25, 30, 0, 22, 28, 16, 20, 34].map((p, i) => ({ date: isoDaysAgo(13 - i), pages: p })),
+    reading: [26, 18, 0, 32, 24, 12, 25, 30, 0, 22, 28, 16, 20, 34].map((p, i) => ({ id: 1000 + i, date: isoDaysAgo(13 - i), pages: p })),
     studyRecords: [
         { id: 1, date: "2026-04-04", subject: "História", pages: 40 },
         { id: 2, date: "2026-04-12", subject: "História", pages: 30 },
@@ -141,9 +165,9 @@ const initialData = {
         { id: 6, date: isoDaysAgo(1), name: "Musculação", minutes: 45 },
         { id: 7, date: isoDaysAgo(0), name: "Muay Thai — Joelhada Step", minutes: 15 },
     ],
-    sleep: [6.2, 7.1, 6.8, 5.9, 7.4, 6.5, 6.9, 7.0, 6.3, 6.7, 7.2, 6.4, 6.8, 6.7].map((h, i) => ({ date: isoDaysAgo(13 - i), hours: h })),
-    waterRecords: [1.6, 1.9, 1.4, 2.1, 1.8, 2.0, 1.7].map((l, i) => ({ date: isoDaysAgo(6 - i), liters: l })),
-    weight: [{ date: isoDaysAgo(90), kg: 78.4 }, { date: isoDaysAgo(60), kg: 77.1 }, { date: isoDaysAgo(30), kg: 76.0 }, { date: isoDaysAgo(0), kg: 75.2 }],
+    sleep: [6.2, 7.1, 6.8, 5.9, 7.4, 6.5, 6.9, 7.0, 6.3, 6.7, 7.2, 6.4, 6.8, 6.7].map((h, i) => ({ id: 2000 + i, date: isoDaysAgo(13 - i), hours: h })),
+    waterRecords: [1.6, 1.9, 1.4, 2.1, 1.8, 2.0, 1.7].map((l, i) => ({ id: 3000 + i, date: isoDaysAgo(6 - i), liters: l })),
+    weight: [{ id: 4001, date: isoDaysAgo(90), kg: 78.4 }, { id: 4002, date: isoDaysAgo(60), kg: 77.1 }, { id: 4003, date: isoDaysAgo(30), kg: 76.0 }, { id: 4004, date: isoDaysAgo(0), kg: 75.2 }],
     bloodPressure: [
         { id: 1, date: isoDaysAgo(6), sistolica: 118, diastolica: 76, bpm: 70 },
         { id: 2, date: isoDaysAgo(3), sistolica: 124, diastolica: 80, bpm: 74 },
@@ -157,7 +181,7 @@ const initialData = {
         { id: 1, date: isoDaysAgo(1), tipo: "Almoço", detalhado: false },
         { id: 2, date: isoDaysAgo(0), tipo: "Frango grelhado com arroz e brócolis", calorias: 520, proteinas: 42, carboidratos: 48, gorduras: 14, detalhado: true },
     ],
-    mood: [{ date: isoDaysAgo(2), mood: "Tranquilo", energy: "Média" }, { date: isoDaysAgo(1), mood: "Motivado", energy: "Alta" }, { date: isoDaysAgo(0), mood: "Tranquilo", energy: "Média" }],
+    mood: [{ id: 5001, date: isoDaysAgo(2), mood: "Tranquilo", energy: "Média" }, { id: 5002, date: isoDaysAgo(1), mood: "Motivado", energy: "Alta" }, { id: 5003, date: isoDaysAgo(0), mood: "Tranquilo", energy: "Média" }],
     accounts: [
         { id: 1, name: "Banco do Brasil", balance: 2400 },
         { id: 2, name: "Nubank", balance: 850 },
@@ -203,7 +227,7 @@ const initialData = {
 function diplomaMeta(d) {
     const period = d.dataInicio && d.dataFim ? `${monthYear(d.dataInicio)} – ${monthYear(d.dataFim)}` : "";
     let duration = "";
-    if (d.tipo === "Formação" || d.tipo === "Pós-graduação") {
+    if (d.tipo === "Formação" || d.tipo === "Pós-graduação" || d.tipo === "Experiência") {
         if (d.dataInicio && d.dataFim) {
             const anos = (new Date(d.dataFim) - new Date(d.dataInicio)) / (1000 * 60 * 60 * 24 * 365.25);
             duration = `${anos.toFixed(1)} anos`;
@@ -308,6 +332,21 @@ function Panel({ children, style, className }) {
 }
 function PrivacyValue({ hide, children }) { return React.createElement("span", { style: serif }, hide ? "••••••" : children); }
 function inputStyle() { return { background: C.surfaceAlt, color: C.text, border: `1px solid ${C.border}`, ...sans }; }
+/* Linha de registro com opção de apagar (e editar quando onEdit é passado) */
+function RecordRow({ left, right, onDelete, onEdit }) {
+    return (React.createElement("div", { className: "flex justify-between items-center gap-2 group text-sm py-0.5", style: { ...sans, color: C.text } },
+        React.createElement("span", { className: "flex-1 min-w-0" }, left),
+        React.createElement("span", { style: { color: C.textMuted }, className: "shrink-0" }, right),
+        React.createElement("span", { className: "flex gap-1 shrink-0 no-print" },
+            onEdit && (React.createElement("button", { onClick: onEdit, title: "Editar", className: "px-1.5 rounded text-xs", style: { background: "transparent", color: C.textMuted, border: `1px solid ${C.border}` } }, "\u270E")),
+            onDelete && (React.createElement("button", { onClick: onDelete, title: "Apagar", className: "px-1.5 rounded text-xs", style: { background: "transparent", color: C.danger, border: `1px solid ${C.border}` } }, "\u2715")))));
+}
+/* Remove um item de qualquer lista do estado, por id ou por índice */
+function useRemover(setData) {
+    return function remove(listKey, matcher) {
+        setData((d) => ({ ...d, [listKey]: d[listKey].filter(matcher) }));
+    };
+}
 /* Gráficos em SVG puro — sem biblioteca externa, funcionam em qualquer navegador */
 function MiniLine({ data, dataKey, color, xKey = "date" }) {
     const w = 600, h = 140, padX = 20, padY = 16;
@@ -412,7 +451,7 @@ function Registrar({ data, setData }) {
             summary = `${values.materia || ""} — ${values.paginas || 0} páginas`;
         }
         if (domain === "conhecimento" && category === "Leitura") {
-            setData((d) => ({ ...d, reading: [...d.reading, { date, pages: Number(values.paginas || 0) }] }));
+            setData((d) => ({ ...d, reading: [...d.reading, { id: Date.now(), date, pages: Number(values.paginas || 0) }] }));
             summary = `Leitura — ${values.paginas || 0} páginas`;
         }
         if (domain === "conhecimento" && category === "Skill desenvolvida") {
@@ -442,15 +481,15 @@ function Registrar({ data, setData }) {
             summary = `${values.tipo || "Exercício"} — ${values.minutos || 0} min`;
         }
         if (domain === "corpo" && category === "Água") {
-            setData((d) => ({ ...d, waterRecords: [...d.waterRecords, { date, liters: Number(values.ml || 0) }] }));
+            setData((d) => ({ ...d, waterRecords: [...d.waterRecords, { id: Date.now(), date, liters: Number(values.ml || 0) }] }));
             summary = `Água — ${values.ml || 0} L`;
         }
         if (domain === "corpo" && category === "Sono") {
-            setData((d) => ({ ...d, sleep: [...d.sleep, { date, hours: Number(values.horas || 0) }] }));
+            setData((d) => ({ ...d, sleep: [...d.sleep, { id: Date.now(), date, hours: Number(values.horas || 0) }] }));
             summary = `Sono — ${values.horas || 0}h`;
         }
         if (domain === "corpo" && category === "Peso") {
-            setData((d) => ({ ...d, weight: [...d.weight, { date, kg: Number(values.kg || 0) }] }));
+            setData((d) => ({ ...d, weight: [...d.weight, { id: Date.now(), date, kg: Number(values.kg || 0) }] }));
             summary = `Peso — ${values.kg || 0} kg`;
         }
         if (domain === "corpo" && category === "Pressão arterial") {
@@ -529,23 +568,19 @@ function Dashboard({ data, hideFinance, period }) {
     }).length;
     const cards = [];
     if (cfg.financeiro)
-        cards.push(React.createElement(StatCard, { key: "fin", icon: Wallet, label: "Financeiro", value: React.createElement(PrivacyValue, { hide: hideFinance },
-                "R$ ",
-                totalBalance), sub: "total em contas", accent: C.bronze }));
+        cards.push(React.createElement(StatCard, { key: "fin", icon: Wallet, label: "Financeiro", value: React.createElement(PrivacyValue, { hide: hideFinance }, money(totalBalance)), sub: "total em contas", accent: C.bronze }));
     if (cfg.doacaoModo !== "oculto")
-        cards.push(React.createElement(StatCard, { key: "car", icon: HeartHandshake, label: "Caridade", value: cfg.doacaoModo === "valor" ? React.createElement(PrivacyValue, { hide: hideFinance },
-                "R$ ",
-                doacaoValor) : pCharity.length, sub: cfg.doacaoModo === "valor" ? "doado no período" : "ações no período", accent: C.bronze }));
+        cards.push(React.createElement(StatCard, { key: "car", icon: HeartHandshake, label: "Caridade", value: cfg.doacaoModo === "valor" ? React.createElement(PrivacyValue, { hide: hideFinance }, money(doacaoValor)) : pCharity.length, sub: cfg.doacaoModo === "valor" ? "doado no período" : "ações no período", accent: C.bronze }));
     if (cfg.leitura)
-        cards.push(React.createElement(StatCard, { key: "lei", icon: BookOpen, label: "Leitura", value: `${sum(pReading.map((r) => r.pages))} pág.`, sub: "no per\u00EDodo" }));
+        cards.push(React.createElement(StatCard, { key: "lei", icon: BookOpen, label: "Leitura", value: `${num(sum(pReading.map((r) => r.pages)))} pág.`, sub: "no per\u00EDodo" }));
     if (cfg.livros)
         cards.push(React.createElement(StatCard, { key: "liv", icon: BookOpen, label: "Livros lidos", value: livrosEsteMes, sub: now.toLocaleDateString("pt-BR", { month: "long" }) }));
     if (cfg.exercicio)
-        cards.push(React.createElement(StatCard, { key: "exe", icon: Activity, label: "Exerc\u00EDcio", value: `${sum(pExercise.map((r) => r.minutes))} min`, sub: "no per\u00EDodo", accent: C.bronze }));
+        cards.push(React.createElement(StatCard, { key: "exe", icon: Activity, label: "Exerc\u00EDcio", value: `${num(sum(pExercise.map((r) => r.minutes)))} min`, sub: "no per\u00EDodo", accent: C.bronze }));
     if (cfg.sono)
         cards.push(React.createElement(StatCard, { key: "son", icon: Moon, label: "Sono", value: pSleep.length ? `${(sum(pSleep.map((r) => r.hours)) / pSleep.length).toFixed(1)}h` : "—", sub: "m\u00E9dia no per\u00EDodo" }));
     if (cfg.peso)
-        cards.push(React.createElement(StatCard, { key: "pes", icon: Activity, label: "Peso", value: pWeight.length ? `${pWeight[pWeight.length - 1].kg} kg` : "—", sub: "no per\u00EDodo", accent: C.bronze }));
+        cards.push(React.createElement(StatCard, { key: "pes", icon: Activity, label: "Peso", value: pWeight.length ? `${num(pWeight[pWeight.length - 1].kg, 1)} kg` : "—", sub: "no per\u00EDodo", accent: C.bronze }));
     if (cfg.pressao)
         cards.push(React.createElement(StatCard, { key: "pre", icon: Activity, label: "Press\u00E3o arterial", value: pBp.length ? `${pBp[pBp.length - 1].sistolica}/${pBp[pBp.length - 1].diastolica}` : "—", sub: "no per\u00EDodo" }));
     if (cfg.estado)
@@ -571,6 +606,7 @@ function Dashboard({ data, hideFinance, period }) {
                     React.createElement(MiniLine, { data: data.weight.map(w => ({ date: fmtDate(w.date), kg: w.kg })), dataKey: "kg", color: C.bronze })))))));
 }
 function Conhecimento({ data, setData, period }) {
+    const remove = useRemover(setData);
     const [form, setForm] = useState({ title: "", author: "", tema: "", totalPages: "", pagesRead: "" });
     const [search, setSearch] = useState("");
     const [results, setResults] = useState([]);
@@ -612,27 +648,35 @@ function Conhecimento({ data, setData, period }) {
     return (React.createElement("div", null,
         React.createElement(SectionTitle, { sub: "Livros, estudos e progresso acumulado" }, "Conhecimento"),
         React.createElement(PeriodFilter, { period: period.value, setPeriod: period.set }),
-        React.createElement("div", { className: "grid md:grid-cols-2 gap-4 mb-6" }, data.books.map((b) => {
-            const pct = Math.round((b.pagesRead / b.totalPages) * 100);
-            return (React.createElement(Panel, { key: b.id },
-                React.createElement("div", { className: "flex justify-between items-start" },
-                    React.createElement("div", null,
-                        React.createElement("div", { style: { ...serif, color: C.text, fontSize: 18 } }, b.title),
-                        React.createElement("div", { className: "text-sm", style: { ...sans, color: C.textMuted } },
-                            b.author,
-                            b.tema ? ` · ${b.tema}` : "")),
-                    React.createElement("span", { className: "text-xs px-2 py-1 rounded", style: { background: C.surfaceAlt, color: C.sage, ...sans } }, b.status)),
-                React.createElement("div", { className: "mt-4" },
-                    React.createElement("div", { className: "h-1.5 rounded-full", style: { background: C.surfaceAlt } },
-                        React.createElement("div", { className: "h-1.5 rounded-full", style: { width: `${pct}%`, background: C.sage } })),
-                    React.createElement("div", { className: "text-xs mt-1", style: { ...sans, color: C.textMuted } },
-                        b.pagesRead,
-                        " de ",
-                        b.totalPages,
-                        " p\u00E1ginas \u2014 ",
-                        pct,
-                        "%"))));
-        })),
+        React.createElement("div", { className: "grid md:grid-cols-2 gap-4 mb-6" },
+            data.books.map((b) => {
+                const pct = b.totalPages ? Math.round((b.pagesRead / b.totalPages) * 100) : 0;
+                return (React.createElement(Panel, { key: b.id },
+                    React.createElement("div", { className: "flex justify-between items-start gap-2" },
+                        React.createElement("div", { className: "min-w-0" },
+                            React.createElement("div", { style: { ...serif, color: C.text, fontSize: 18 } }, b.title),
+                            React.createElement("div", { className: "text-sm", style: { ...sans, color: C.textMuted } },
+                                b.author,
+                                b.tema ? ` · ${b.tema}` : "")),
+                        React.createElement("div", { className: "flex items-center gap-1 shrink-0" },
+                            React.createElement("span", { className: "text-xs px-2 py-1 rounded", style: { background: C.surfaceAlt, color: C.sage, ...sans } }, b.status),
+                            React.createElement("button", { onClick: () => remove("books", (x) => x.id !== b.id), title: "Apagar livro", className: "px-1.5 py-1 rounded text-xs no-print", style: { background: "transparent", color: C.danger, border: `1px solid ${C.border}` } }, "\u2715"))),
+                    React.createElement("div", { className: "mt-4" },
+                        React.createElement("div", { className: "h-1.5 rounded-full", style: { background: C.surfaceAlt } },
+                            React.createElement("div", { className: "h-1.5 rounded-full", style: { width: `${Math.min(pct, 100)}%`, background: C.sage } })),
+                        React.createElement("div", { className: "text-xs mt-1 flex items-center justify-between gap-2", style: { ...sans, color: C.textMuted } },
+                            React.createElement("span", null,
+                                num(b.pagesRead),
+                                " de ",
+                                num(b.totalPages),
+                                " p\u00E1ginas \u2014 ",
+                                pct,
+                                "%"),
+                            React.createElement("span", { className: "flex items-center gap-1 no-print" },
+                                React.createElement("input", { type: "number", value: b.pagesRead, onChange: (e) => setData((d) => ({ ...d, books: d.books.map((x) => x.id === b.id ? { ...x, pagesRead: Number(e.target.value || 0), status: Number(e.target.value || 0) >= x.totalPages ? "concluído" : "lendo", dataConclusao: Number(e.target.value || 0) >= x.totalPages ? (x.dataConclusao || todayIso()) : undefined } : x) })), className: "w-16 px-1 py-0.5 rounded text-xs", style: inputStyle(), title: "Atualizar p\u00E1ginas lidas" }))))));
+            }),
+            data.books.length === 0 && React.createElement(Panel, null,
+                React.createElement("div", { className: "text-sm", style: { color: C.textMuted, ...sans } }, "Nenhum livro cadastrado."))),
         React.createElement(Panel, { style: { maxWidth: 520 }, className: "mb-6" },
             React.createElement(SectionTitle, { sub: "Busque na Open Library para preencher automaticamente, ou digite manualmente" }, "Adicionar livro"),
             React.createElement("form", { onSubmit: searchBooks, className: "flex gap-2 mb-3" },
@@ -662,201 +706,138 @@ function Conhecimento({ data, setData, period }) {
         React.createElement(Panel, { className: "mb-6" },
             React.createElement(SectionTitle, { sub: "Habilidades desenvolvidas \u2014 filtradas pelo per\u00EDodo selecionado" }, "Skills"),
             React.createElement("div", { className: "flex flex-col gap-2 text-sm", style: sans },
-                pSkills.map((s) => (React.createElement("div", { key: s.id, className: "flex justify-between", style: { color: C.text } },
-                    React.createElement("span", null,
+                pSkills.map((s) => (React.createElement(RecordRow, { key: s.id, left: React.createElement("span", null,
                         s.nome,
-                        s.nota ? ` — ${s.nota}` : ""),
-                    React.createElement("span", { style: { color: C.textMuted } },
-                        s.nivel,
-                        " \u00B7 ",
-                        fmtDate(s.date))))),
+                        s.nota ? ` — ${s.nota}` : ""), right: `${s.nivel} · ${fmtDate(s.date)}`, onDelete: () => remove("skills", (x) => x.id !== s.id) }))),
                 pSkills.length === 0 && React.createElement("div", { style: { color: C.textMuted } }, "Nenhuma skill registrada neste per\u00EDodo."))),
         React.createElement(Panel, null,
             React.createElement(SectionTitle, null, "Registros do per\u00EDodo selecionado"),
             React.createElement("div", { className: "flex flex-col gap-1 text-sm", style: sans },
-                pReading.map((r, i) => React.createElement("div", { key: "r" + i, className: "flex justify-between", style: { color: C.text } },
-                    React.createElement("span", null, "Leitura"),
-                    React.createElement("span", { style: { color: C.textMuted } },
-                        r.pages,
-                        " p\u00E1g. \u2014 ",
-                        fmtDate(r.date)))),
-                pStudy.map((r) => React.createElement("div", { key: r.id, className: "flex justify-between", style: { color: C.text } },
-                    React.createElement("span", null,
-                        "Estudo \u2014 ",
-                        r.subject),
-                    React.createElement("span", { style: { color: C.textMuted } },
-                        r.pages,
-                        " p\u00E1g. \u2014 ",
-                        fmtDate(r.date)))),
+                pReading.map((r) => React.createElement(RecordRow, { key: "r" + r.id, left: "Leitura", right: `${num(r.pages)} pág. — ${fmtDate(r.date)}`, onDelete: () => remove("reading", (x) => x.id !== r.id) })),
+                pStudy.map((r) => React.createElement(RecordRow, { key: "s" + r.id, left: `Estudo — ${r.subject}`, right: `${num(r.pages)} pág. — ${fmtDate(r.date)}`, onDelete: () => remove("studyRecords", (x) => x.id !== r.id) })),
                 pReading.length === 0 && pStudy.length === 0 && React.createElement("div", { style: { color: C.textMuted } }, "Nenhum registro neste per\u00EDodo.")))));
 }
-function Corpo({ data, period }) {
-    const totalMinutes = sum(data.exerciseRecords.map((r) => r.minutes));
+function Corpo({ data, setData, period }) {
+    const remove = useRemover(setData);
+    const p = period.value;
+    const pExercise = data.exerciseRecords.filter((r) => inPeriod(r.date, p));
+    const pSleep = data.sleep.filter((r) => inPeriod(r.date, p));
+    const pWeight = data.weight.filter((r) => inPeriod(r.date, p));
+    const pWater = data.waterRecords.filter((r) => inPeriod(r.date, p));
+    const pBp = data.bloodPressure.filter((r) => inPeriod(r.date, p));
+    const pMeds = data.medications.filter((r) => inPeriod(r.date, p));
+    const pMeals = data.meals.filter((r) => inPeriod(r.date, p));
+    // Todos os totais e gráficos respeitam o período selecionado
+    const totalMinutes = sum(pExercise.map((r) => r.minutes));
     const byExercise = {};
-    data.exerciseRecords.forEach((r) => { byExercise[r.name] = (byExercise[r.name] || 0) + r.minutes; });
-    const exChart = Object.entries(byExercise).map(([name, minutes]) => ({ name, minutes }));
-    const pExercise = data.exerciseRecords.filter((r) => inPeriod(r.date, period.value));
-    const pSleep = data.sleep.filter((r) => inPeriod(r.date, period.value));
-    const pWeight = data.weight.filter((r) => inPeriod(r.date, period.value));
-    const pWater = data.waterRecords.filter((r) => inPeriod(r.date, period.value));
-    const pBp = data.bloodPressure.filter((r) => inPeriod(r.date, period.value));
-    const pMeds = data.medications.filter((r) => inPeriod(r.date, period.value));
-    const pMeals = data.meals.filter((r) => inPeriod(r.date, period.value));
+    pExercise.forEach((r) => { byExercise[r.name] = (byExercise[r.name] || 0) + Number(r.minutes || 0); });
+    const exChart = Object.entries(byExercise).map(([name, minutes]) => ({ name, minutes })).sort((a, b) => b.minutes - a.minutes);
+    const maxEx = Math.max(1, ...exChart.map((x) => x.minutes));
+    const sonoMedia = pSleep.length ? sum(pSleep.map((s) => s.hours)) / pSleep.length : null;
+    const aguaMedia = pWater.length ? sum(pWater.map((w) => w.liters)) / pWater.length : null;
+    const pesoAtual = pWeight.length ? pWeight[pWeight.length - 1].kg : null;
     return (React.createElement("div", null,
         React.createElement(SectionTitle, { sub: "Exerc\u00EDcio, sono, \u00E1gua, peso, press\u00E3o, rem\u00E9dios e alimenta\u00E7\u00E3o" }, "Corpo"),
         React.createElement(PeriodFilter, { period: period.value, setPeriod: period.set }),
         React.createElement("div", { className: "grid grid-cols-2 md:grid-cols-4 gap-4 mb-6" },
-            React.createElement(StatCard, { icon: Activity, label: "Exerc\u00EDcio (7 dias)", value: `${totalMinutes} min` }),
-            React.createElement(StatCard, { icon: Moon, label: "Sono m\u00E9dio", value: `${(sum(data.sleep.slice(-7).map(s => s.hours)) / 7).toFixed(1)}h`, accent: C.bronze }),
-            React.createElement(StatCard, { icon: Droplet, label: "\u00C1gua (m\u00E9dia)", value: `${(sum(data.waterRecords.map(w => w.liters)) / data.waterRecords.length).toFixed(1)} L` }),
-            React.createElement(StatCard, { icon: Activity, label: "Peso atual", value: `${data.weight[data.weight.length - 1].kg} kg`, accent: C.bronze })),
+            React.createElement(StatCard, { icon: Activity, label: "Exerc\u00EDcio no per\u00EDodo", value: `${num(totalMinutes)} min` }),
+            React.createElement(StatCard, { icon: Moon, label: "Sono m\u00E9dio", value: sonoMedia !== null ? `${sonoMedia.toFixed(1)}h` : "—", accent: C.bronze }),
+            React.createElement(StatCard, { icon: Droplet, label: "\u00C1gua (m\u00E9dia)", value: aguaMedia !== null ? `${aguaMedia.toFixed(1)} L` : "—" }),
+            React.createElement(StatCard, { icon: Activity, label: "Peso", value: pesoAtual !== null ? `${num(pesoAtual, 1)} kg` : "—", accent: C.bronze })),
         React.createElement("div", { className: "grid md:grid-cols-2 gap-4 mb-6" },
             React.createElement(Panel, null,
-                React.createElement(SectionTitle, { sub: "Por tipo, \u00FAltimos 7 dias" }, "Minutos por exerc\u00EDcio"),
-                React.createElement("div", { className: "flex flex-col gap-3" }, exChart.sort((a, b) => b.minutes - a.minutes).map((e) => {
-                    const max = Math.max(...exChart.map((x) => x.minutes));
-                    const pct = Math.round((e.minutes / max) * 100);
-                    return (React.createElement("div", { key: e.name },
+                React.createElement(SectionTitle, { sub: "Por tipo, no per\u00EDodo selecionado" }, "Minutos por exerc\u00EDcio"),
+                React.createElement("div", { className: "flex flex-col gap-3" },
+                    exChart.map((e) => (React.createElement("div", { key: e.name },
                         React.createElement("div", { className: "flex justify-between text-xs mb-1", style: { ...sans, color: C.text } },
                             React.createElement("span", null, e.name),
                             React.createElement("span", { style: { color: C.textMuted } },
-                                e.minutes,
+                                num(e.minutes),
                                 " min")),
                         React.createElement("div", { className: "h-1.5 rounded-full", style: { background: C.surfaceAlt } },
-                            React.createElement("div", { className: "h-1.5 rounded-full", style: { width: `${pct}%`, background: C.sage } }))));
-                }))),
+                            React.createElement("div", { className: "h-1.5 rounded-full", style: { width: `${Math.round((e.minutes / maxEx) * 100)}%`, background: C.sage } }))))),
+                    exChart.length === 0 && React.createElement("div", { className: "text-sm", style: { color: C.textMuted, ...sans } }, "Nenhum exerc\u00EDcio neste per\u00EDodo."))),
             React.createElement(Panel, null,
-                React.createElement(SectionTitle, { sub: "\u00DAltimos 4 registros" }, "Peso \u2014 trajet\u00F3ria"),
-                React.createElement(MiniLine, { data: data.weight.map(w => ({ date: fmtDate(w.date), kg: w.kg })), dataKey: "kg", color: C.bronze }))),
+                React.createElement(SectionTitle, { sub: "No per\u00EDodo selecionado" }, "Peso \u2014 trajet\u00F3ria"),
+                pWeight.length > 0
+                    ? React.createElement(MiniLine, { data: pWeight.map((w) => ({ date: fmtDate(w.date), kg: w.kg })), dataKey: "kg", color: C.bronze })
+                    : React.createElement("div", { className: "text-sm", style: { color: C.textMuted, ...sans } }, "Nenhum registro de peso neste per\u00EDodo."))),
         React.createElement("div", { className: "grid md:grid-cols-2 gap-4 mb-6" },
             React.createElement(Panel, null,
                 React.createElement(SectionTitle, { sub: "Sist\u00F3lica/diast\u00F3lica \u00B7 BPM opcional" }, "Press\u00E3o arterial"),
-                React.createElement("div", { className: "flex flex-col gap-1 text-sm", style: sans }, data.bloodPressure.slice(-5).map((r) => React.createElement("div", { key: r.id, className: "flex justify-between", style: { color: C.text } },
-                    React.createElement("span", null,
-                        r.sistolica,
-                        "/",
-                        r.diastolica,
-                        r.bpm ? ` · ${r.bpm}bpm` : ""),
-                    React.createElement("span", { style: { color: C.textMuted } }, fmtDate(r.date)))))),
+                React.createElement("div", { className: "flex flex-col gap-1 text-sm", style: sans },
+                    pBp.map((r) => (React.createElement(RecordRow, { key: r.id, left: `${r.sistolica}/${r.diastolica}${r.bpm ? ` · ${r.bpm} bpm` : ""}`, right: fmtDate(r.date), onDelete: () => remove("bloodPressure", (x) => x.id !== r.id) }))),
+                    pBp.length === 0 && React.createElement("div", { style: { color: C.textMuted } }, "Nenhum registro neste per\u00EDodo."))),
             React.createElement(Panel, null,
                 React.createElement(SectionTitle, { sub: "Registro e organiza\u00E7\u00E3o \u2014 sem diagn\u00F3stico ou recomenda\u00E7\u00E3o" }, "Rem\u00E9dios e suplementos"),
-                React.createElement("div", { className: "flex flex-col gap-1 text-sm", style: sans }, data.medications.slice(-5).map((m) => React.createElement("div", { key: m.id, className: "flex justify-between", style: { color: C.text } },
-                    React.createElement("span", null,
-                        m.nome,
-                        " \u2014 ",
-                        m.dose),
-                    React.createElement("span", { style: { color: C.textMuted } },
-                        m.horario,
-                        " \u00B7 ",
-                        fmtDate(m.date))))))),
+                React.createElement("div", { className: "flex flex-col gap-1 text-sm", style: sans },
+                    pMeds.map((m) => (React.createElement(RecordRow, { key: m.id, left: `${m.nome}${m.dose ? ` — ${m.dose}` : ""}`, right: `${m.horario || ""} · ${fmtDate(m.date)}`, onDelete: () => remove("medications", (x) => x.id !== m.id) }))),
+                    pMeds.length === 0 && React.createElement("div", { style: { color: C.textMuted } }, "Nenhum registro neste per\u00EDodo.")))),
         React.createElement(Panel, { className: "mb-6" },
             React.createElement(SectionTitle, { sub: "Modo simples ou detalhado, \u00E0 sua escolha" }, "Alimenta\u00E7\u00E3o"),
-            React.createElement("div", { className: "flex flex-col gap-1 text-sm", style: sans }, data.meals.slice(-6).map((m) => (React.createElement("div", { key: m.id, className: "flex justify-between", style: { color: C.text } },
-                React.createElement("span", null,
-                    m.tipo,
-                    m.detalhado ? ` — ${m.calorias} kcal (P${m.proteinas}/C${m.carboidratos}/G${m.gorduras})` : ""),
-                React.createElement("span", { style: { color: C.textMuted } }, fmtDate(m.date))))))),
-        React.createElement(Panel, null,
-            React.createElement(SectionTitle, null, "Registros do per\u00EDodo selecionado"),
             React.createElement("div", { className: "flex flex-col gap-1 text-sm", style: sans },
-                pExercise.map((r) => React.createElement("div", { key: "e" + r.id, className: "flex justify-between", style: { color: C.text } },
-                    React.createElement("span", null, r.name),
-                    React.createElement("span", { style: { color: C.textMuted } },
-                        r.minutes,
-                        " min \u2014 ",
-                        fmtDate(r.date)))),
-                pSleep.map((r, i) => React.createElement("div", { key: "s" + i, className: "flex justify-between", style: { color: C.text } },
-                    React.createElement("span", null, "Sono"),
-                    React.createElement("span", { style: { color: C.textMuted } },
-                        r.hours,
-                        "h \u2014 ",
-                        fmtDate(r.date)))),
-                pWeight.map((r, i) => React.createElement("div", { key: "w" + i, className: "flex justify-between", style: { color: C.text } },
-                    React.createElement("span", null, "Peso"),
-                    React.createElement("span", { style: { color: C.textMuted } },
-                        r.kg,
-                        "kg \u2014 ",
-                        fmtDate(r.date)))),
-                pWater.map((r, i) => React.createElement("div", { key: "a" + i, className: "flex justify-between", style: { color: C.text } },
-                    React.createElement("span", null, "\u00C1gua"),
-                    React.createElement("span", { style: { color: C.textMuted } },
-                        r.liters,
-                        "L \u2014 ",
-                        fmtDate(r.date)))),
-                pBp.map((r) => React.createElement("div", { key: "bp" + r.id, className: "flex justify-between", style: { color: C.text } },
-                    React.createElement("span", null, "Press\u00E3o"),
-                    React.createElement("span", { style: { color: C.textMuted } },
-                        r.sistolica,
-                        "/",
-                        r.diastolica,
-                        " \u2014 ",
-                        fmtDate(r.date)))),
-                pMeds.map((r) => React.createElement("div", { key: "m" + r.id, className: "flex justify-between", style: { color: C.text } },
-                    React.createElement("span", null, r.nome),
-                    React.createElement("span", { style: { color: C.textMuted } },
-                        r.dose,
-                        " \u2014 ",
-                        fmtDate(r.date)))),
-                pMeals.map((r) => React.createElement("div", { key: "al" + r.id, className: "flex justify-between", style: { color: C.text } },
-                    React.createElement("span", null, r.tipo),
-                    React.createElement("span", { style: { color: C.textMuted } }, fmtDate(r.date)))),
-                [pExercise, pSleep, pWeight, pWater, pBp, pMeds, pMeals].every((a) => a.length === 0) && React.createElement("div", { style: { color: C.textMuted } }, "Nenhum registro neste per\u00EDodo.")))));
+                pMeals.map((m) => (React.createElement(RecordRow, { key: m.id, left: `${m.tipo}${m.detalhado ? ` — ${num(m.calorias)} kcal (P${num(m.proteinas)} / C${num(m.carboidratos)} / G${num(m.gorduras)})` : ""}`, right: fmtDate(m.date), onDelete: () => remove("meals", (x) => x.id !== m.id) }))),
+                pMeals.length === 0 && React.createElement("div", { style: { color: C.textMuted } }, "Nenhum registro neste per\u00EDodo."))),
+        React.createElement(Panel, null,
+            React.createElement(SectionTitle, null, "Exerc\u00EDcio, sono, \u00E1gua e peso no per\u00EDodo"),
+            React.createElement("div", { className: "flex flex-col gap-1 text-sm", style: sans },
+                pExercise.map((r) => React.createElement(RecordRow, { key: "e" + r.id, left: r.name, right: `${num(r.minutes)} min — ${fmtDate(r.date)}`, onDelete: () => remove("exerciseRecords", (x) => x.id !== r.id) })),
+                pSleep.map((r) => React.createElement(RecordRow, { key: "s" + r.id, left: "Sono", right: `${num(r.hours, 1)}h — ${fmtDate(r.date)}`, onDelete: () => remove("sleep", (x) => x.id !== r.id) })),
+                pWeight.map((r) => React.createElement(RecordRow, { key: "w" + r.id, left: "Peso", right: `${num(r.kg, 1)} kg — ${fmtDate(r.date)}`, onDelete: () => remove("weight", (x) => x.id !== r.id) })),
+                pWater.map((r) => React.createElement(RecordRow, { key: "a" + r.id, left: "\u00C1gua", right: `${num(r.liters, 1)} L — ${fmtDate(r.date)}`, onDelete: () => remove("waterRecords", (x) => x.id !== r.id) })),
+                [pExercise, pSleep, pWeight, pWater].every((a) => a.length === 0) && React.createElement("div", { style: { color: C.textMuted } }, "Nenhum registro neste per\u00EDodo.")))));
 }
-function Tempo({ data, period }) {
+function Tempo({ data, setData, period }) {
+    const remove = useRemover(setData);
+    const p = period.value;
+    const pProcrastination = data.procrastinationRecords.filter((r) => inPeriod(r.date, p));
     const t = data.time;
-    const procrastMinutesTotal = sum(data.procrastinationRecords.map((r) => r.minutes));
-    const procrastHoursTotal = procrastMinutesTotal / 60;
+    const procrastMin = sum(pProcrastination.map((r) => r.minutes));
     const items = [
-        { label: "Trabalho", value: t.trabalho, unit: "h" },
-        { label: "Estudo", value: t.estudo, unit: "h" },
-        { label: "Exercício", value: t.exercicio, unit: "h" },
-        { label: "Lazer", value: t.lazer, unit: "h" },
-        { label: "Redes sociais / procrastinação", value: Number(procrastHoursTotal.toFixed(1)), unit: "h" },
+        { label: "Trabalho", value: t.trabalho },
+        { label: "Estudo", value: t.estudo },
+        { label: "Exercício", value: t.exercicio },
+        { label: "Lazer", value: t.lazer },
+        { label: "Redes sociais / procrastinação", value: Number((procrastMin / 60).toFixed(1)), destaque: true },
     ];
-    const total = sum(items.map((i) => i.value));
+    const total = sum(items.map((i) => i.value)) || 1;
     const byApp = {};
-    data.procrastinationRecords.forEach((r) => { byApp[r.app] = (byApp[r.app] || 0) + r.minutes; });
-    const appChart = Object.entries(byApp).map(([name, minutes]) => ({ name, minutes }));
-    const pProcrastination = data.procrastinationRecords.filter((r) => inPeriod(r.date, period.value));
+    pProcrastination.forEach((r) => { byApp[r.app] = (byApp[r.app] || 0) + Number(r.minutes || 0); });
+    const appChart = Object.entries(byApp).map(([name, minutes]) => ({ name, minutes })).sort((a, b) => b.minutes - a.minutes);
     return (React.createElement("div", null,
         React.createElement(SectionTitle, { sub: "Onde o tempo realmente foi parar, incluindo redes sociais" }, "Tempo"),
         React.createElement(PeriodFilter, { period: period.value, setPeriod: period.set }),
         React.createElement(Panel, { className: "mb-6" },
-            React.createElement("div", { className: "flex flex-col gap-3" }, items.map((i) => {
-                const pct = Math.round((i.value / total) * 100);
-                return (React.createElement("div", { key: i.label },
-                    React.createElement("div", { className: "flex justify-between text-sm mb-1", style: { ...sans, color: C.text } },
-                        React.createElement("span", null, i.label),
-                        React.createElement("span", { style: { color: C.textMuted } },
-                            i.value,
-                            i.unit)),
-                    React.createElement("div", { className: "h-1.5 rounded-full", style: { background: C.surfaceAlt } },
-                        React.createElement("div", { className: "h-1.5 rounded-full", style: { width: `${pct}%`, background: i.label.includes("procrastinação") ? C.bronze : C.sage } }))));
-            }))),
-        React.createElement("div", { className: "grid md:grid-cols-2 gap-4 mb-6" },
+            React.createElement("div", { className: "flex flex-col gap-3" }, items.map((i) => (React.createElement("div", { key: i.label },
+                React.createElement("div", { className: "flex justify-between text-sm mb-1", style: { ...sans, color: C.text } },
+                    React.createElement("span", null, i.label),
+                    React.createElement("span", { style: { color: C.textMuted } },
+                        num(i.value, 1),
+                        "h")),
+                React.createElement("div", { className: "h-1.5 rounded-full", style: { background: C.surfaceAlt } },
+                    React.createElement("div", { className: "h-1.5 rounded-full", style: { width: `${Math.round((i.value / total) * 100)}%`, background: i.destaque ? C.bronze : C.sage } }))))))),
+        React.createElement("div", { className: "grid md:grid-cols-2 gap-4" },
             React.createElement(Panel, null,
-                React.createElement(SectionTitle, { sub: "Minutos acumulados, todos os registros" }, "Redes sociais por app"),
-                React.createElement(MiniBar, { data: appChart, dataKey: "minutes", color: C.bronze })),
+                React.createElement(SectionTitle, { sub: "No per\u00EDodo selecionado" }, "Redes sociais por app"),
+                appChart.length > 0
+                    ? React.createElement(MiniBar, { data: appChart, dataKey: "minutes", color: C.bronze })
+                    : React.createElement("div", { className: "text-sm", style: { color: C.textMuted, ...sans } }, "Nenhum registro neste per\u00EDodo.")),
             React.createElement(Panel, null,
-                React.createElement(SectionTitle, null, "Registros do per\u00EDodo selecionado"),
+                React.createElement(SectionTitle, { sub: `Total: ${num(procrastMin)} min` }, "Registros do per\u00EDodo"),
                 React.createElement("div", { className: "flex flex-col gap-1 text-sm", style: sans },
-                    pProcrastination.map((r) => React.createElement("div", { key: r.id, className: "flex justify-between", style: { color: C.text } },
-                        React.createElement("span", null, r.app),
-                        React.createElement("span", { style: { color: C.textMuted } },
-                            r.minutes,
-                            " min \u2014 ",
-                            fmtDate(r.date)))),
+                    pProcrastination.map((r) => (React.createElement(RecordRow, { key: r.id, left: r.app, right: `${num(r.minutes)} min — ${fmtDate(r.date)}`, onDelete: () => remove("procrastinationRecords", (x) => x.id !== r.id) }))),
                     pProcrastination.length === 0 && React.createElement("div", { style: { color: C.textMuted } }, "Nenhum registro neste per\u00EDodo."))))));
 }
-const COINGECKO_IDS = { SHIB: "shiba-inu", BTC: "bitcoin", ETH: "ethereum", DOGE: "dogecoin", SOL: "solana", ADA: "cardano" };
-function Financeiro({ data, hideFinance, setHideFinance, period }) {
+const COINGECKO_IDS = { SHIB: "shiba-inu", BTC: "bitcoin", ETH: "ethereum", DOGE: "dogecoin", SOL: "solana", ADA: "cardano", XRP: "ripple", BNB: "binancecoin" };
+function Financeiro({ data, setData, hideFinance, setHideFinance, period }) {
+    const remove = useRemover(setData);
     const [prices, setPrices] = useState({});
-    const [priceStatus, setPriceStatus] = useState("idle"); // idle | loading | ok | error
+    const [priceStatus, setPriceStatus] = useState("idle");
     const [quotes, setQuotes] = useState({});
     const [quoteStatus, setQuoteStatus] = useState({});
     const totalBalance = sum(data.accounts.map((a) => a.balance));
     const cryptoHoldings = {};
-    data.cryptoPurchases.forEach((p) => { cryptoHoldings[p.coin] = (cryptoHoldings[p.coin] || 0) + p.quantity; });
+    data.cryptoPurchases.forEach((p) => { cryptoHoldings[p.coin] = (cryptoHoldings[p.coin] || 0) + Number(p.quantity || 0); });
     async function fetchCryptoPrices() {
         setPriceStatus("loading");
         try {
@@ -878,13 +859,13 @@ function Financeiro({ data, hideFinance, setHideFinance, period }) {
         }
     }
     async function fetchQuote(name) {
-        var _a, _b;
         setQuoteStatus((s) => ({ ...s, [name]: "loading" }));
         try {
-            const ticker = name.split(" ")[name.split(" ").length - 1].replace(/[^A-Za-z0-9]/g, "");
+            const parts = name.split(" ");
+            const ticker = parts[parts.length - 1].replace(/[^A-Za-z0-9]/g, "");
             const res = await fetch(`https://brapi.dev/api/quote/${ticker}`);
             const json = await res.json();
-            if ((_b = (_a = json === null || json === void 0 ? void 0 : json.results) === null || _a === void 0 ? void 0 : _a[0]) === null || _b === void 0 ? void 0 : _b.regularMarketPrice) {
+            if (json && json.results && json.results[0] && json.results[0].regularMarketPrice) {
                 setQuotes((q) => ({ ...q, [name]: json.results[0].regularMarketPrice }));
                 setQuoteStatus((s) => ({ ...s, [name]: "ok" }));
             }
@@ -899,120 +880,158 @@ function Financeiro({ data, hideFinance, setHideFinance, period }) {
     const pTx = data.transactions.filter((t) => inPeriod(t.date, period.value));
     const entradasPeriodo = sum(pTx.filter((t) => t.operacao === "Entrada").map((t) => t.valor));
     const saidasPeriodo = sum(pTx.filter((t) => t.operacao === "Saída").map((t) => t.valor));
+    function ajustarConta(id, delta) {
+        setData((d) => ({ ...d, accounts: d.accounts.map((a) => a.id === id ? { ...a, balance: Number(a.balance || 0) + delta } : a) }));
+    }
     return (React.createElement("div", null,
         React.createElement("div", { className: "flex justify-between items-center mb-4" },
             React.createElement(SectionTitle, { sub: "Contas, criptomoedas e investimentos" }, "Financeiro"),
-            React.createElement("button", { onClick: () => setHideFinance(!hideFinance), className: "flex items-center gap-1 text-xs px-3 py-1.5 rounded", style: { background: C.surface, color: C.textMuted, border: `1px solid ${C.border}`, ...sans } },
+            React.createElement("button", { onClick: () => setHideFinance(!hideFinance), className: "flex items-center gap-1 text-xs px-3 py-1.5 rounded h-fit", style: { background: C.surface, color: C.textMuted, border: `1px solid ${C.border}`, ...sans } },
                 hideFinance ? React.createElement(Eye, { size: 13 }) : React.createElement(EyeOff, { size: 13 }),
                 " ",
                 hideFinance ? "Mostrar valores" : "Ocultar valores")),
         React.createElement(PeriodFilter, { period: period.value, setPeriod: period.set }),
         React.createElement("div", { className: "grid md:grid-cols-2 gap-4 mb-6" },
             React.createElement(Panel, null,
-                React.createElement(SectionTitle, { sub: "Total (contas de banco/carteira)" },
+                React.createElement(SectionTitle, { sub: "Total em contas de banco e carteiras" },
                     "Contas \u2014 ",
-                    React.createElement(PrivacyValue, { hide: hideFinance },
-                        "R$ ",
-                        totalBalance)),
-                React.createElement("div", { className: "flex flex-col gap-2" }, data.accounts.map((a) => (React.createElement("div", { key: a.id, className: "flex justify-between text-sm", style: { ...sans, color: C.text } },
-                    React.createElement("span", null, a.name),
-                    React.createElement("span", { style: { color: C.textMuted } },
-                        React.createElement(PrivacyValue, { hide: hideFinance },
-                            "R$ ",
-                            a.balance))))))),
+                    React.createElement(PrivacyValue, { hide: hideFinance }, money(totalBalance))),
+                React.createElement("div", { className: "flex flex-col gap-2" },
+                    data.accounts.map((a) => (React.createElement("div", { key: a.id, className: "flex justify-between items-center gap-2 text-sm", style: { ...sans, color: C.text } },
+                        React.createElement("span", { className: "flex-1 min-w-0" }, a.name),
+                        React.createElement("span", { style: { color: C.textMuted } },
+                            React.createElement(PrivacyValue, { hide: hideFinance }, money(a.balance))),
+                        React.createElement("span", { className: "flex gap-1 no-print" },
+                            React.createElement("button", { onClick: () => { const v = prompt(`Adicionar quanto em ${a.name}?`); if (v)
+                                    ajustarConta(a.id, Math.abs(Number(v.replace(",", ".")) || 0)); }, className: "px-1.5 rounded text-xs", style: { background: "transparent", color: C.sage, border: `1px solid ${C.border}` }, title: "Adicionar" }, "+"),
+                            React.createElement("button", { onClick: () => { const v = prompt(`Remover quanto de ${a.name}?`); if (v)
+                                    ajustarConta(a.id, -Math.abs(Number(v.replace(",", ".")) || 0)); }, className: "px-1.5 rounded text-xs", style: { background: "transparent", color: C.bronze, border: `1px solid ${C.border}` }, title: "Remover" }, "\u2212"),
+                            React.createElement("button", { onClick: () => remove("accounts", (x) => x.id !== a.id), className: "px-1.5 rounded text-xs", style: { background: "transparent", color: C.danger, border: `1px solid ${C.border}` }, title: "Apagar conta" }, "\u2715"))))),
+                    data.accounts.length === 0 && React.createElement("div", { className: "text-sm", style: { color: C.textMuted } }, "Nenhuma conta cadastrada."))),
             React.createElement(Panel, null,
                 React.createElement(SectionTitle, { sub: "\u00DAltimas 4 semanas" }, "Entradas vs. sa\u00EDdas"),
                 React.createElement(GroupedBar, { data: data.weeklyFlow, keys: ["entradas", "saidas"], colors: [C.sage, C.bronze], xKey: "week" }))),
         React.createElement("div", { className: "grid md:grid-cols-2 gap-4 mb-6" },
             React.createElement(Panel, null,
-                React.createElement("div", { className: "flex items-center justify-between mb-1" },
+                React.createElement("div", { className: "flex items-center justify-between mb-1 gap-2" },
                     React.createElement("div", { className: "flex items-center gap-2", style: { color: C.bronze } },
                         React.createElement(Coins, { size: 16 }),
                         React.createElement("span", { style: { ...serif, fontSize: 16, color: C.text } }, "Criptomoedas")),
-                    React.createElement("button", { onClick: fetchCryptoPrices, className: "text-xs px-2 py-1 rounded", style: { background: C.surfaceAlt, color: C.textMuted, border: `1px solid ${C.border}`, ...sans } }, priceStatus === "loading" ? "Consultando..." : "Consultar preço (CoinGecko)")),
-                React.createElement("p", { className: "text-xs mb-3", style: { ...sans, color: C.textMuted } }, "Mostra apenas a quantidade \u2014 o valor varia e n\u00E3o entra no total de patrim\u00F4nio. O pre\u00E7o consultado \u00E9 s\u00F3 refer\u00EAncia."),
-                React.createElement("div", { className: "flex flex-col gap-2 mb-4" }, Object.entries(cryptoHoldings).map(([coin, qty]) => (React.createElement("div", { key: coin, className: "flex justify-between text-sm", style: { ...sans, color: C.text } },
-                    React.createElement("span", null, coin),
-                    React.createElement("span", { style: { color: C.sage } },
-                        qty.toLocaleString("pt-BR"),
-                        prices[coin] ? React.createElement("span", { style: { color: C.textMuted } },
-                            " \u00B7 ref. R$ ",
-                            (prices[coin] * qty).toLocaleString("pt-BR", { maximumFractionDigits: 2 })) : ""))))),
-                priceStatus === "error" && React.createElement("p", { className: "text-xs mb-2", style: { ...sans, color: C.danger } }, "N\u00E3o consegui consultar agora (rede ou limite de chamadas). Tente de novo em instantes."),
-                React.createElement("div", { className: "text-xs", style: { ...sans, color: C.textMuted } }, "Hist\u00F3rico de compras (refer\u00EAncia de valoriza\u00E7\u00E3o):"),
-                React.createElement("div", { className: "flex flex-col gap-1 mt-1" }, data.cryptoPurchases.map((p) => (React.createElement("div", { key: p.id, className: "flex justify-between text-xs", style: { ...sans, color: C.textMuted } },
-                    React.createElement("span", null,
-                        fmtDate(p.date),
-                        " \u2014 ",
-                        p.coin),
-                    React.createElement("span", null,
-                        "R$ ",
-                        p.brlSpent,
-                        " \u2192 ",
-                        p.quantity.toLocaleString("pt-BR"))))))),
+                    React.createElement("button", { onClick: fetchCryptoPrices, className: "text-xs px-2 py-1 rounded no-print", style: { background: C.surfaceAlt, color: C.textMuted, border: `1px solid ${C.border}`, ...sans } }, priceStatus === "loading" ? "Consultando..." : "Consultar preço")),
+                React.createElement("p", { className: "text-xs mb-3", style: { ...sans, color: C.textMuted } }, "Apenas a quantidade conta \u2014 o valor varia e n\u00E3o entra no total de patrim\u00F4nio."),
+                React.createElement("div", { className: "flex flex-col gap-2 mb-4" },
+                    Object.entries(cryptoHoldings).map(([coin, q]) => (React.createElement("div", { key: coin, className: "flex justify-between text-sm", style: { ...sans, color: C.text } },
+                        React.createElement("span", null, coin),
+                        React.createElement("span", { style: { color: C.sage } },
+                            qty(q),
+                            prices[coin] ? React.createElement("span", { style: { color: C.textMuted } },
+                                " \u00B7 ref. ",
+                                money(prices[coin] * q)) : "")))),
+                    Object.keys(cryptoHoldings).length === 0 && React.createElement("div", { className: "text-sm", style: { color: C.textMuted } }, "Nenhuma criptomoeda registrada.")),
+                priceStatus === "error" && React.createElement("p", { className: "text-xs mb-2", style: { ...sans, color: C.danger } }, "N\u00E3o consegui consultar agora. Tente de novo em instantes."),
+                data.cryptoPurchases.length > 0 && React.createElement("div", { className: "text-xs mb-1", style: { ...sans, color: C.textMuted } }, "Hist\u00F3rico de compras:"),
+                React.createElement("div", { className: "flex flex-col gap-1" }, data.cryptoPurchases.map((pc) => (React.createElement(RecordRow, { key: pc.id, left: `${fmtDate(pc.date)} — ${pc.coin}`, right: `${money(pc.brlSpent)} → ${qty(pc.quantity)}`, onDelete: () => remove("cryptoPurchases", (x) => x.id !== pc.id) }))))),
             React.createElement(Panel, null,
                 React.createElement("div", { className: "flex items-center gap-2 mb-1", style: { color: C.sage } },
                     React.createElement(TrendingUp, { size: 16 }),
                     React.createElement("span", { style: { ...serif, fontSize: 16, color: C.text } }, "A\u00E7\u00F5es / investimentos")),
                 React.createElement("p", { className: "text-xs mb-3", style: { ...sans, color: C.textMuted } }, "Tamb\u00E9m por quantidade \u2014 n\u00E3o entra no total em dinheiro."),
-                React.createElement("div", { className: "flex flex-col gap-2" }, data.investments.map((i) => (React.createElement("div", { key: i.id, className: "flex justify-between items-center text-sm", style: { ...sans, color: C.text } },
-                    React.createElement("span", null, i.name),
-                    React.createElement("div", { className: "flex items-center gap-2" },
-                        React.createElement("span", { style: { color: C.sage } }, i.quantity),
-                        quotes[i.name] ? React.createElement("span", { className: "text-xs", style: { color: C.textMuted } },
-                            "R$ ",
-                            quotes[i.name]) :
-                            React.createElement("button", { onClick: () => fetchQuote(i.name), className: "text-xs px-2 py-0.5 rounded", style: { background: C.surfaceAlt, color: C.textMuted, border: `1px solid ${C.border}` } }, quoteStatus[i.name] === "loading" ? "..." : quoteStatus[i.name] === "error" ? "Indisponível" : "Cotação")))))),
-                React.createElement("p", { className: "text-xs mt-3", style: { ...sans, color: C.textMuted } }, "Cota\u00E7\u00E3o de a\u00E7\u00F5es brasileiras via API gratuita \u2014 pode ficar indispon\u00EDvel sem uma chave pr\u00F3pria; numa vers\u00E3o final vale ter uma fonte paga e um backend cuidando disso."))),
+                React.createElement("div", { className: "flex flex-col gap-2" },
+                    data.investments.map((i) => (React.createElement("div", { key: i.id, className: "flex justify-between items-center gap-2 text-sm", style: { ...sans, color: C.text } },
+                        React.createElement("span", { className: "flex-1 min-w-0" }, i.name),
+                        React.createElement("span", { style: { color: C.sage } }, qty(i.quantity)),
+                        React.createElement("span", { className: "flex items-center gap-1 no-print" },
+                            quotes[i.name]
+                                ? React.createElement("span", { className: "text-xs", style: { color: C.textMuted } }, money(quotes[i.name]))
+                                : React.createElement("button", { onClick: () => fetchQuote(i.name), className: "text-xs px-2 py-0.5 rounded", style: { background: C.surfaceAlt, color: C.textMuted, border: `1px solid ${C.border}` } }, quoteStatus[i.name] === "loading" ? "..." : quoteStatus[i.name] === "error" ? "Indisponível" : "Cotação"),
+                            React.createElement("button", { onClick: () => remove("investments", (x) => x.id !== i.id), className: "px-1.5 rounded text-xs", style: { background: "transparent", color: C.danger, border: `1px solid ${C.border}` }, title: "Apagar" }, "\u2715"))))),
+                    data.investments.length === 0 && React.createElement("div", { className: "text-sm", style: { color: C.textMuted } }, "Nenhum investimento registrado.")))),
         React.createElement(Panel, null,
-            React.createElement(SectionTitle, { sub: `Entradas: R$ ${entradasPeriodo} · Saídas: R$ ${saidasPeriodo}` }, "Transa\u00E7\u00F5es do per\u00EDodo selecionado"),
+            React.createElement(SectionTitle, { sub: `Entradas: ${money(entradasPeriodo)} · Saídas: ${money(saidasPeriodo)}` }, "Transa\u00E7\u00F5es do per\u00EDodo selecionado"),
             React.createElement("div", { className: "flex flex-col gap-1 text-sm", style: sans },
-                pTx.map((t) => (React.createElement("div", { key: t.id, className: "flex justify-between", style: { color: C.text } },
-                    React.createElement("span", null,
-                        t.categoria,
-                        " \u2014 ",
-                        t.conta),
-                    React.createElement("span", { style: { color: t.operacao === "Saída" ? C.bronze : C.sage } },
+                pTx.map((t) => (React.createElement(RecordRow, { key: t.id, left: `${t.categoria} — ${t.conta}`, right: React.createElement("span", { style: { color: t.operacao === "Saída" ? C.bronze : C.sage } },
                         React.createElement(PrivacyValue, { hide: hideFinance },
                             t.operacao === "Saída" ? "-" : "+",
-                            "R$ ",
-                            t.valor,
-                            " \u00B7 ",
-                            fmtDate(t.date)))))),
+                            money(t.valor)),
+                        " \u00B7 ",
+                        fmtDate(t.date)), onDelete: () => remove("transactions", (x) => x.id !== t.id) }))),
                 pTx.length === 0 && React.createElement("div", { style: { color: C.textMuted } }, "Nenhuma transa\u00E7\u00E3o neste per\u00EDodo.")))));
 }
-function Caridade({ data, period, hideFinance }) {
+function Caridade({ data, setData, period, hideFinance }) {
+    const remove = useRemover(setData);
     const pCharity = data.charity.filter((c) => inPeriod(c.date, period.value));
     const totalDoado = sum(pCharity.filter((c) => c.valor).map((c) => c.valor));
     return (React.createElement("div", null,
         React.createElement(SectionTitle, { sub: "O que voc\u00EA faz pelo pr\u00F3ximo \u2014 inclui doa\u00E7\u00F5es em dinheiro, ligadas ao Financeiro" }, "Caridade"),
         React.createElement(PeriodFilter, { period: period.value, setPeriod: period.set }),
-        React.createElement(StatCard, { icon: HeartHandshake, label: "Doado no per\u00EDodo", value: React.createElement(PrivacyValue, { hide: hideFinance },
-                "R$ ",
-                totalDoado) }),
-        React.createElement("div", { className: "mt-4" },
-            React.createElement(Panel, null,
-                React.createElement("div", { className: "flex flex-col gap-3" },
-                    pCharity.map((c) => (React.createElement("div", { key: c.id, className: "flex justify-between text-sm", style: { ...sans, color: C.text } },
-                        React.createElement("span", null,
-                            c.description,
-                            c.conta ? ` (via ${c.conta})` : ""),
-                        React.createElement("span", { style: { color: C.textMuted } },
-                            c.valor ? React.createElement(PrivacyValue, { hide: hideFinance },
-                                "R$ ",
-                                c.valor,
-                                " \u00B7 ") : "",
-                            fmtDate(c.date))))),
-                    pCharity.length === 0 && React.createElement("div", { style: { color: C.textMuted }, className: "text-sm" }, "Nenhum registro neste per\u00EDodo."))))));
+        React.createElement("div", { className: "grid grid-cols-2 gap-4 mb-4" },
+            React.createElement(StatCard, { icon: HeartHandshake, label: "A\u00E7\u00F5es no per\u00EDodo", value: pCharity.length }),
+            React.createElement(StatCard, { icon: Wallet, label: "Doado no per\u00EDodo", value: React.createElement(PrivacyValue, { hide: hideFinance }, money(totalDoado)), accent: C.bronze })),
+        React.createElement(Panel, null,
+            React.createElement("div", { className: "flex flex-col gap-2" },
+                pCharity.map((c) => (React.createElement(RecordRow, { key: c.id, left: `${c.description}${c.conta ? ` (via ${c.conta})` : ""}`, right: React.createElement("span", null,
+                        c.valor ? React.createElement("span", null,
+                            React.createElement(PrivacyValue, { hide: hideFinance }, money(c.valor)),
+                            " \u00B7 ") : null,
+                        fmtDate(c.date)), onDelete: () => remove("charity", (x) => x.id !== c.id) }))),
+                pCharity.length === 0 && React.createElement("div", { style: { color: C.textMuted, ...sans }, className: "text-sm" }, "Nenhum registro neste per\u00EDodo.")))));
 }
-function Relatorios({ data, period }) {
-    const thisWeek = sum(data.reading.slice(7, 14).map(r => r.pages));
-    const prevWeek = sum(data.reading.slice(0, 7).map(r => r.pages));
-    const livrosConcluidos = data.books.filter((b) => b.status === "concluído").length;
-    const pCharity = data.charity.filter((c) => inPeriod(c.date, period.value));
+const PERIOD_NAMES = { dia: "dia", semana: "semana", mes: "mês", ano: "ano" };
+/* Desloca a data de referência para o período anterior equivalente */
+function previousPeriod(p) {
+    const d = new Date(p.ref + "T00:00:00");
+    if (p.type === "dia")
+        d.setDate(d.getDate() - 1);
+    else if (p.type === "semana")
+        d.setDate(d.getDate() - 7);
+    else if (p.type === "mes")
+        d.setMonth(d.getMonth() - 1);
+    else if (p.type === "ano")
+        d.setFullYear(d.getFullYear() - 1);
+    return { type: p.type, ref: d.toISOString().slice(0, 10) };
+}
+/* Agrupa registros do período em "baldes" apropriados à escala escolhida */
+function bucketize(records, p, dateKey, valueKey) {
+    const inP = records.filter((r) => inPeriod(r[dateKey], p));
+    const buckets = new Map();
+    inP.forEach((r) => {
+        const d = new Date(r[dateKey] + "T00:00:00");
+        let key, label;
+        if (p.type === "ano") {
+            key = d.getMonth();
+            label = d.toLocaleDateString("pt-BR", { month: "short" });
+        }
+        else if (p.type === "mes") {
+            key = Math.floor((d.getDate() - 1) / 7);
+            label = `sem ${key + 1}`;
+        }
+        else {
+            key = r[dateKey];
+            label = fmtDate(r[dateKey]);
+        }
+        const prev = buckets.get(key) || { label, total: 0 };
+        prev.total += Number(r[valueKey] || 0);
+        buckets.set(key, prev);
+    });
+    return Array.from(buckets.entries())
+        .sort((a, b) => (a[0] > b[0] ? 1 : -1))
+        .map(([, v]) => ({ date: v.label, total: v.total }));
+}
+function Relatorios({ data, period, hideFinance }) {
+    const p = period.value;
+    const prev = previousPeriod(p);
+    const nome = PERIOD_NAMES[p.type];
+    const leituraAtual = sum(data.reading.filter((r) => inPeriod(r.date, p)).map((r) => r.pages));
+    const leituraAnterior = sum(data.reading.filter((r) => inPeriod(r.date, prev)).map((r) => r.pages));
+    const exercicioAtual = sum(data.exerciseRecords.filter((r) => inPeriod(r.date, p)).map((r) => r.minutes));
+    const exercicioAnterior = sum(data.exerciseRecords.filter((r) => inPeriod(r.date, prev)).map((r) => r.minutes));
+    const pCharity = data.charity.filter((c) => inPeriod(c.date, p));
     const doacoesPeriodo = sum(pCharity.filter((c) => c.valor).map((c) => c.valor));
-    const pProcrastination = data.procrastinationRecords.filter((r) => inPeriod(r.date, period.value));
-    const procrastinacaoPeriodo = sum(pProcrastination.map((r) => r.minutes));
+    const procrastinacaoPeriodo = sum(data.procrastinationRecords.filter((r) => inPeriod(r.date, p)).map((r) => r.minutes));
+    const livrosPeriodo = data.books.filter((b) => b.status === "concluído" && b.dataConclusao && inPeriod(b.dataConclusao, p)).length;
+    const pWeight = data.weight.filter((r) => inPeriod(r.date, p));
+    const leituraChart = bucketize(data.reading, p, "date", "pages");
+    const exercicioChart = bucketize(data.exerciseRecords, p, "date", "minutes");
     return (React.createElement("div", null,
         React.createElement("div", { className: "flex justify-between items-center mb-3 no-print" },
             React.createElement(SectionTitle, { sub: "Compara\u00E7\u00E3o hist\u00F3rica \u2014 sem metas, sem cobran\u00E7a" }, "Relat\u00F3rios"),
@@ -1023,76 +1042,149 @@ function Relatorios({ data, period }) {
             React.createElement(PeriodFilter, { period: period.value, setPeriod: period.set })),
         React.createElement("div", { className: "print-area" },
             React.createElement("div", { className: "grid grid-cols-2 md:grid-cols-4 gap-4 mb-6" },
-                React.createElement(StatCard, { icon: BookOpen, label: "Livros conclu\u00EDdos", value: livrosConcluidos }),
-                React.createElement(StatCard, { icon: HeartHandshake, label: "Doa\u00E7\u00F5es no per\u00EDodo", value: `R$ ${doacoesPeriodo}`, accent: C.bronze }),
-                React.createElement(StatCard, { icon: Activity, label: "Peso atual", value: `${data.weight[data.weight.length - 1].kg} kg` }),
-                React.createElement(StatCard, { icon: Smartphone, label: "Redes sociais no per\u00EDodo", value: `${procrastinacaoPeriodo} min`, accent: C.bronze })),
+                React.createElement(StatCard, { icon: BookOpen, label: "Livros conclu\u00EDdos", value: livrosPeriodo, sub: `neste ${nome}` }),
+                React.createElement(StatCard, { icon: HeartHandshake, label: "Doa\u00E7\u00F5es", value: React.createElement(PrivacyValue, { hide: hideFinance }, money(doacoesPeriodo)), sub: `neste ${nome}`, accent: C.bronze }),
+                React.createElement(StatCard, { icon: Activity, label: "Peso", value: pWeight.length ? `${num(pWeight[pWeight.length - 1].kg, 1)} kg` : "—", sub: `neste ${nome}` }),
+                React.createElement(StatCard, { icon: Smartphone, label: "Redes sociais", value: `${num(procrastinacaoPeriodo)} min`, sub: `neste ${nome}`, accent: C.bronze })),
+            React.createElement("div", { className: "grid md:grid-cols-2 gap-4 mb-4" },
+                React.createElement(Panel, null,
+                    React.createElement(SectionTitle, { sub: `Total de páginas por ${nome} selecionado` }, "Leitura"),
+                    leituraChart.length > 0
+                        ? React.createElement(MiniBar, { data: leituraChart, dataKey: "total", color: C.sage, xKey: "date" })
+                        : React.createElement("div", { className: "text-sm", style: { color: C.textMuted, ...sans } }, "Nenhum registro de leitura neste per\u00EDodo.")),
+                React.createElement(Panel, null,
+                    React.createElement(SectionTitle, { sub: `Total de minutos por ${nome} selecionado` }, "Exerc\u00EDcio"),
+                    exercicioChart.length > 0
+                        ? React.createElement(MiniBar, { data: exercicioChart, dataKey: "total", color: C.bronze, xKey: "date" })
+                        : React.createElement("div", { className: "text-sm", style: { color: C.textMuted, ...sans } }, "Nenhum registro de exerc\u00EDcio neste per\u00EDodo."))),
             React.createElement(Panel, { className: "mb-4" },
-                React.createElement(SectionTitle, null, "Leitura \u2014 esta semana vs. semana anterior"),
-                React.createElement("div", { className: "grid grid-cols-2 gap-4 text-center mt-2" },
-                    React.createElement("div", null,
-                        React.createElement("div", { style: { ...serif, fontSize: 28, color: C.text } }, thisWeek),
-                        React.createElement("div", { className: "text-xs", style: { ...sans, color: C.textMuted } }, "p\u00E1ginas esta semana")),
-                    React.createElement("div", null,
-                        React.createElement("div", { style: { ...serif, fontSize: 28, color: C.textMuted } }, prevWeek),
-                        React.createElement("div", { className: "text-xs", style: { ...sans, color: C.textMuted } }, "p\u00E1ginas semana anterior")))),
+                React.createElement(SectionTitle, { sub: `Comparando com o ${nome} anterior` },
+                    "Este ",
+                    nome,
+                    " vs. anterior"),
+                React.createElement("div", { className: "grid grid-cols-2 gap-6 mt-2" },
+                    React.createElement("div", { className: "text-center" },
+                        React.createElement("div", { className: "text-xs mb-2", style: { ...sans, color: C.textMuted } }, "Leitura (p\u00E1ginas)"),
+                        React.createElement("div", { className: "flex justify-around" },
+                            React.createElement("div", null,
+                                React.createElement("div", { style: { ...serif, fontSize: 26, color: C.text } }, num(leituraAtual)),
+                                React.createElement("div", { className: "text-xs", style: { ...sans, color: C.textMuted } },
+                                    "este ",
+                                    nome)),
+                            React.createElement("div", null,
+                                React.createElement("div", { style: { ...serif, fontSize: 26, color: C.textMuted } }, num(leituraAnterior)),
+                                React.createElement("div", { className: "text-xs", style: { ...sans, color: C.textMuted } }, "anterior")))),
+                    React.createElement("div", { className: "text-center" },
+                        React.createElement("div", { className: "text-xs mb-2", style: { ...sans, color: C.textMuted } }, "Exerc\u00EDcio (minutos)"),
+                        React.createElement("div", { className: "flex justify-around" },
+                            React.createElement("div", null,
+                                React.createElement("div", { style: { ...serif, fontSize: 26, color: C.text } }, num(exercicioAtual)),
+                                React.createElement("div", { className: "text-xs", style: { ...sans, color: C.textMuted } },
+                                    "este ",
+                                    nome)),
+                            React.createElement("div", null,
+                                React.createElement("div", { style: { ...serif, fontSize: 26, color: C.textMuted } }, num(exercicioAnterior)),
+                                React.createElement("div", { className: "text-xs", style: { ...sans, color: C.textMuted } }, "anterior")))))),
             React.createElement(Panel, null,
-                React.createElement(SectionTitle, { sub: "Trajet\u00F3ria do peso nos \u00FAltimos meses" }, "Corpo \u2014 vis\u00E3o de longo prazo"),
-                React.createElement(MiniLine, { data: data.weight.map(w => ({ date: fmtDate(w.date), kg: w.kg })), dataKey: "kg", color: C.bronze })))));
+                React.createElement(SectionTitle, { sub: "Todos os registros de peso" }, "Peso \u2014 vis\u00E3o de longo prazo"),
+                data.weight.length > 0
+                    ? React.createElement(MiniLine, { data: data.weight.map((w) => ({ date: fmtDate(w.date), kg: w.kg })), dataKey: "kg", color: C.bronze })
+                    : React.createElement("div", { className: "text-sm", style: { color: C.textMuted, ...sans } }, "Nenhum registro de peso.")))));
 }
 function Curriculo({ data, setData }) {
-    const [form, setForm] = useState({ tipo: "Certificado", titulo: "", instituicao: "", dataInicio: "", dataFim: "", horas: "" });
+    const remove = useRemover(setData);
+    const [form, setForm] = useState({ tipo: "Certificado", titulo: "", instituicao: "", dataInicio: "", dataFim: "", horas: "", descricao: "" });
     const [profileEdit, setProfileEdit] = useState(data.profile);
     function addItem(e) {
         e.preventDefault();
         if (!form.titulo)
             return;
         setData((d) => ({ ...d, diplomas: [...d.diplomas, { id: Date.now(), ...form }] }));
-        setForm({ tipo: "Certificado", titulo: "", instituicao: "", dataInicio: "", dataFim: "", horas: "" });
+        setForm({ tipo: "Certificado", titulo: "", instituicao: "", dataInicio: "", dataFim: "", horas: "", descricao: "" });
     }
     function saveProfile(e) {
         e.preventDefault();
         setData((d) => ({ ...d, profile: profileEdit }));
     }
+    const ORDEM = ["Formação", "Pós-graduação", "Experiência", "Curso", "Certificado", "Idioma"];
     const grouped = {};
     data.diplomas.forEach((d) => { grouped[d.tipo] = grouped[d.tipo] || []; grouped[d.tipo].push(d); });
-    const isFormacao = form.tipo === "Formação" || form.tipo === "Pós-graduação";
+    const tiposOrdenados = ORDEM.filter((t) => grouped[t]).concat(Object.keys(grouped).filter((t) => !ORDEM.includes(t)));
+    const isFormacao = form.tipo === "Formação" || form.tipo === "Pós-graduação" || form.tipo === "Experiência";
+    const idade = data.profile.dataNascimento
+        ? Math.floor((Date.now() - new Date(data.profile.dataNascimento + "T00:00:00").getTime()) / (1000 * 60 * 60 * 24 * 365.25))
+        : null;
+    const totalHoras = sum(data.diplomas.filter((d) => d.horas).map((d) => d.horas));
+    const livrosLidos = data.books.filter((b) => b.status === "concluído").length;
     return (React.createElement("div", null,
         React.createElement("div", { className: "flex justify-between items-center mb-4 no-print" },
-            React.createElement(SectionTitle, { sub: "Dados pessoais, forma\u00E7\u00E3o, certificados e diplomas \u2014 pronto para impress\u00E3o" }, "Curr\u00EDculo"),
-            React.createElement("button", { onClick: () => window.print(), className: "flex items-center gap-1 text-xs px-3 py-1.5 rounded", style: { background: C.sage, color: C.bg, ...sans } },
+            React.createElement(SectionTitle, { sub: "Dados pessoais, forma\u00E7\u00E3o, experi\u00EAncias e habilidades \u2014 pronto para impress\u00E3o" }, "Curr\u00EDculo"),
+            React.createElement("button", { onClick: () => window.print(), className: "flex items-center gap-1 text-xs px-3 py-1.5 rounded h-fit", style: { background: C.sage, color: C.bg, ...sans } },
                 React.createElement(Printer, { size: 13 }),
                 " Imprimir")),
         React.createElement("div", { className: "print-area" },
-            React.createElement("div", { className: "mb-6" },
-                React.createElement("div", { style: { ...serif, fontSize: 24, color: C.text } }, data.profile.nome),
-                React.createElement("div", { className: "text-sm", style: { ...sans, color: C.textMuted } },
-                    data.profile.dataNascimento && `Nascimento: ${new Date(data.profile.dataNascimento + "T00:00:00").toLocaleDateString("pt-BR")} · `,
+            React.createElement("div", { className: "mb-6 pb-4", style: { borderBottom: `1px solid ${C.border}` } },
+                React.createElement("div", { style: { ...serif, fontSize: 26, color: C.text } }, data.profile.nome || "Seu nome"),
+                data.profile.cargo && React.createElement("div", { className: "text-sm mt-1", style: { ...sans, color: C.sage } }, data.profile.cargo),
+                React.createElement("div", { className: "text-sm mt-2", style: { ...sans, color: C.textMuted } },
+                    idade !== null && `${idade} anos`,
+                    idade !== null && (data.profile.telefone || data.profile.email) ? " · " : "",
                     data.profile.telefone,
                     data.profile.telefone && data.profile.email ? " · " : "",
-                    data.profile.email)),
-            Object.entries(grouped).map(([tipo, items]) => (React.createElement(Panel, { key: tipo, style: { marginBottom: 16 } },
+                    data.profile.email),
+                data.profile.cidade && React.createElement("div", { className: "text-sm", style: { ...sans, color: C.textMuted } }, data.profile.cidade),
+                data.profile.resumo && React.createElement("p", { className: "text-sm mt-3", style: { ...sans, color: C.text } }, data.profile.resumo)),
+            tiposOrdenados.map((tipo) => (React.createElement(Panel, { key: tipo, style: { marginBottom: 16 } },
                 React.createElement(SectionTitle, null, tipo),
-                React.createElement("div", { className: "flex flex-col gap-2" }, items.map((it) => (React.createElement("div", { key: it.id, className: "flex justify-between text-sm", style: { ...sans, color: C.text } },
-                    React.createElement("span", null,
-                        it.titulo,
-                        it.instituicao ? ` — ${it.instituicao}` : ""),
-                    React.createElement("span", { style: { color: C.textMuted } }, diplomaMeta(it)))))))))),
-        React.createElement("div", { className: "grid md:grid-cols-2 gap-4 no-print" },
+                React.createElement("div", { className: "flex flex-col gap-3" }, grouped[tipo].map((it) => (React.createElement("div", { key: it.id },
+                    React.createElement("div", { className: "flex justify-between items-start gap-2" },
+                        React.createElement("div", { className: "min-w-0" },
+                            React.createElement("div", { className: "text-sm", style: { ...sans, color: C.text } }, it.titulo),
+                            it.instituicao && React.createElement("div", { className: "text-xs", style: { ...sans, color: C.textMuted } }, it.instituicao),
+                            it.descricao && React.createElement("div", { className: "text-xs mt-1", style: { ...sans, color: C.textMuted } }, it.descricao)),
+                        React.createElement("div", { className: "flex items-center gap-2 shrink-0" },
+                            React.createElement("span", { className: "text-xs", style: { ...sans, color: C.textMuted } }, diplomaMeta(it)),
+                            React.createElement("button", { onClick: () => remove("diplomas", (x) => x.id !== it.id), className: "px-1.5 rounded text-xs no-print", style: { background: "transparent", color: C.danger, border: `1px solid ${C.border}` }, title: "Apagar" }, "\u2715")))))))))),
+            data.skills.length > 0 && (React.createElement(Panel, { style: { marginBottom: 16 } },
+                React.createElement(SectionTitle, null, "Habilidades"),
+                React.createElement("div", { className: "flex flex-wrap gap-2" }, data.skills.map((s) => (React.createElement("span", { key: s.id, className: "text-xs px-2 py-1 rounded", style: { background: C.surfaceAlt, color: C.text, ...sans } },
+                    s.nome,
+                    s.nivel ? ` · ${s.nivel}` : "")))))),
+            React.createElement(Panel, null,
+                React.createElement(SectionTitle, { sub: "N\u00FAmeros acumulados a partir dos seus pr\u00F3prios registros" }, "Forma\u00E7\u00E3o continuada"),
+                React.createElement("div", { className: "grid grid-cols-3 gap-4 text-center" },
+                    React.createElement("div", null,
+                        React.createElement("div", { style: { ...serif, fontSize: 22, color: C.text } },
+                            num(totalHoras),
+                            "h"),
+                        React.createElement("div", { className: "text-xs", style: { ...sans, color: C.textMuted } }, "em cursos")),
+                    React.createElement("div", null,
+                        React.createElement("div", { style: { ...serif, fontSize: 22, color: C.text } }, livrosLidos),
+                        React.createElement("div", { className: "text-xs", style: { ...sans, color: C.textMuted } }, "livros lidos")),
+                    React.createElement("div", null,
+                        React.createElement("div", { style: { ...serif, fontSize: 22, color: C.text } }, data.skills.length),
+                        React.createElement("div", { className: "text-xs", style: { ...sans, color: C.textMuted } }, "habilidades"))))),
+        React.createElement("div", { className: "grid md:grid-cols-2 gap-4 no-print mt-4" },
             React.createElement(Panel, null,
                 React.createElement(SectionTitle, null, "Dados pessoais"),
                 React.createElement("form", { onSubmit: saveProfile, className: "flex flex-col gap-3" },
-                    React.createElement("input", { placeholder: "Nome completo", value: profileEdit.nome, onChange: (e) => setProfileEdit({ ...profileEdit, nome: e.target.value }), className: "p-2 rounded", style: inputStyle() }),
-                    React.createElement("input", { type: "date", placeholder: "Data de nascimento", value: profileEdit.dataNascimento, onChange: (e) => setProfileEdit({ ...profileEdit, dataNascimento: e.target.value }), className: "p-2 rounded", style: inputStyle() }),
-                    React.createElement("input", { placeholder: "Telefone", value: profileEdit.telefone, onChange: (e) => setProfileEdit({ ...profileEdit, telefone: e.target.value }), className: "p-2 rounded", style: inputStyle() }),
-                    React.createElement("input", { placeholder: "Email", value: profileEdit.email, onChange: (e) => setProfileEdit({ ...profileEdit, email: e.target.value }), className: "p-2 rounded", style: inputStyle() }),
+                    React.createElement("input", { placeholder: "Nome completo", value: profileEdit.nome || "", onChange: (e) => setProfileEdit({ ...profileEdit, nome: e.target.value }), className: "p-2 rounded", style: inputStyle() }),
+                    React.createElement("input", { placeholder: "Cargo ou \u00E1rea (ex: Analista Administrativo)", value: profileEdit.cargo || "", onChange: (e) => setProfileEdit({ ...profileEdit, cargo: e.target.value }), className: "p-2 rounded", style: inputStyle() }),
+                    React.createElement("div", null,
+                        React.createElement("label", { className: "text-xs block mb-1", style: { ...sans, color: C.textMuted } }, "Data de nascimento"),
+                        React.createElement("input", { type: "date", value: profileEdit.dataNascimento || "", onChange: (e) => setProfileEdit({ ...profileEdit, dataNascimento: e.target.value }), className: "w-full p-2 rounded", style: inputStyle() })),
+                    React.createElement("input", { placeholder: "Telefone", value: profileEdit.telefone || "", onChange: (e) => setProfileEdit({ ...profileEdit, telefone: e.target.value }), className: "p-2 rounded", style: inputStyle() }),
+                    React.createElement("input", { placeholder: "Email", value: profileEdit.email || "", onChange: (e) => setProfileEdit({ ...profileEdit, email: e.target.value }), className: "p-2 rounded", style: inputStyle() }),
+                    React.createElement("input", { placeholder: "Cidade / estado", value: profileEdit.cidade || "", onChange: (e) => setProfileEdit({ ...profileEdit, cidade: e.target.value }), className: "p-2 rounded", style: inputStyle() }),
+                    React.createElement("textarea", { placeholder: "Resumo profissional (2 a 3 linhas)", value: profileEdit.resumo || "", onChange: (e) => setProfileEdit({ ...profileEdit, resumo: e.target.value }), rows: 3, className: "p-2 rounded", style: inputStyle() }),
                     React.createElement("button", { type: "submit", className: "rounded py-2", style: { background: C.sage, color: C.bg, ...sans, fontWeight: 500 } }, "Salvar dados"))),
             React.createElement(Panel, null,
                 React.createElement(SectionTitle, null, "Adicionar ao curr\u00EDculo"),
                 React.createElement("form", { onSubmit: addItem, className: "flex flex-col gap-3" },
-                    React.createElement("select", { value: form.tipo, onChange: (e) => setForm({ ...form, tipo: e.target.value }), className: "w-full p-2 rounded", style: inputStyle() }, ["Formação", "Pós-graduação", "Curso", "Certificado", "Idioma", "Experiência"].map((t) => React.createElement("option", { key: t }, t))),
-                    React.createElement("input", { placeholder: "T\u00EDtulo", value: form.titulo, onChange: (e) => setForm({ ...form, titulo: e.target.value }), className: "p-2 rounded", style: inputStyle() }),
-                    React.createElement("input", { placeholder: "Institui\u00E7\u00E3o / empresa", value: form.instituicao, onChange: (e) => setForm({ ...form, instituicao: e.target.value }), className: "p-2 rounded", style: inputStyle() }),
+                    React.createElement("select", { value: form.tipo, onChange: (e) => setForm({ ...form, tipo: e.target.value }), className: "w-full p-2 rounded", style: inputStyle() }, ORDEM.map((t) => React.createElement("option", { key: t }, t))),
+                    React.createElement("input", { placeholder: form.tipo === "Experiência" ? "Cargo" : "Título", value: form.titulo, onChange: (e) => setForm({ ...form, titulo: e.target.value }), className: "p-2 rounded", style: inputStyle() }),
+                    React.createElement("input", { placeholder: form.tipo === "Experiência" ? "Empresa" : "Instituição", value: form.instituicao, onChange: (e) => setForm({ ...form, instituicao: e.target.value }), className: "p-2 rounded", style: inputStyle() }),
+                    React.createElement("textarea", { placeholder: "Descri\u00E7\u00E3o (opcional) \u2014 o que voc\u00EA fez ou aprendeu", value: form.descricao, onChange: (e) => setForm({ ...form, descricao: e.target.value }), rows: 2, className: "p-2 rounded", style: inputStyle() }),
                     React.createElement("div", { className: "grid grid-cols-2 gap-3" },
                         React.createElement("div", null,
                             React.createElement("label", { className: "text-xs block mb-1", style: { color: C.textMuted, ...sans } }, "In\u00EDcio"),
@@ -1103,7 +1195,7 @@ function Curriculo({ data, setData }) {
                     !isFormacao && (React.createElement("div", null,
                         React.createElement("label", { className: "text-xs block mb-1", style: { color: C.textMuted, ...sans } }, "Carga hor\u00E1ria (horas)"),
                         React.createElement("input", { type: "number", value: form.horas, onChange: (e) => setForm({ ...form, horas: e.target.value }), className: "w-full p-2 rounded", style: inputStyle() }))),
-                    isFormacao && React.createElement("p", { className: "text-xs", style: { color: C.textMuted, ...sans } }, "Para Forma\u00E7\u00E3o/P\u00F3s-gradua\u00E7\u00E3o, a dura\u00E7\u00E3o em anos \u00E9 calculada a partir das datas."),
+                    isFormacao && React.createElement("p", { className: "text-xs", style: { color: C.textMuted, ...sans } }, "A dura\u00E7\u00E3o em anos \u00E9 calculada a partir das datas."),
                     React.createElement("button", { type: "submit", className: "rounded py-2", style: { background: C.sage, color: C.bg, ...sans, fontWeight: 500 } }, "Adicionar"))))));
 }
 const LANGUAGES = [
@@ -1112,6 +1204,22 @@ const LANGUAGES = [
     { code: "es", label: "Español" },
     { code: "fr", label: "Français" },
 ];
+/* Estado zerado — mantém só o perfil e as preferências do usuário */
+function emptyData(current) {
+    return {
+        dashboardConfig: current.dashboardConfig,
+        currency: current.currency || "BRL",
+        profile: current.profile,
+        books: [], reading: [], studyRecords: [], skills: [],
+        exerciseRecords: [], sleep: [], waterRecords: [], weight: [],
+        bloodPressure: [], medications: [], meals: [], mood: [],
+        accounts: [], transactions: [],
+        weeklyFlow: [{ week: "Sem. -3", entradas: 0, saidas: 0 }, { week: "Sem. -2", entradas: 0, saidas: 0 }, { week: "Sem. -1", entradas: 0, saidas: 0 }, { week: "Esta", entradas: 0, saidas: 0 }],
+        cryptoPurchases: [], investments: [], charity: [],
+        time: { estudo: 0, trabalho: 0, exercicio: 0, lazer: 0 },
+        procrastinationRecords: [], diplomas: [],
+    };
+}
 function Configuracoes({ lang, setLang, data, setData }) {
     const cfg = data.dashboardConfig;
     const [importMsg, setImportMsg] = useState("");
@@ -1186,6 +1294,17 @@ function Configuracoes({ lang, setLang, data, setData }) {
                     React.createElement("option", { value: "valor" }, "O valor doado"),
                     React.createElement("option", { value: "oculto" }, "N\u00E3o mostrar no Dashboard")))),
         React.createElement(Panel, { className: "mt-4", style: { maxWidth: 480 } },
+            React.createElement(SectionTitle, { sub: "Moeda usada para exibir todos os valores do app" }, "Moeda"),
+            React.createElement("select", { value: data.currency || "BRL", onChange: (e) => setData((d) => ({ ...d, currency: e.target.value })), className: "w-full max-w-xs p-2 rounded mb-2", style: inputStyle() }, Object.entries(CURRENCIES).map(([code, c]) => React.createElement("option", { key: code, value: code }, c.label)))),
+        React.createElement(Panel, { className: "mt-4", style: { maxWidth: 480 } },
+            React.createElement(SectionTitle, { sub: "Remove os dados de demonstra\u00E7\u00E3o e deixa o app pronto para os seus pr\u00F3prios registros" }, "Limpar registros"),
+            React.createElement("button", { onClick: () => {
+                    if (window.confirm("Isso vai apagar TODOS os registros (livros, exercícios, finanças, caridade, currículo). Seus dados pessoais e preferências são mantidos. Deseja continuar?")) {
+                        setData((d) => emptyData(d));
+                    }
+                }, className: "rounded py-2 w-full text-sm", style: { background: "transparent", color: C.danger, border: `1px solid ${C.danger}`, ...sans, fontWeight: 500 } }, "Apagar todos os registros"),
+            React.createElement("p", { className: "text-xs mt-2", style: { ...sans, color: C.textMuted } }, "Exporte um backup antes, se quiser guardar os dados atuais.")),
+        React.createElement(Panel, { className: "mt-4", style: { maxWidth: 480 } },
             React.createElement(SectionTitle, { sub: "O app salva sozinho neste navegador a cada altera\u00E7\u00E3o \u2014 o bot\u00E3o abaixo \u00E9 para levar seus dados para outro aparelho ou guardar uma c\u00F3pia \u00E0 parte" }, "Backup dos dados"),
             React.createElement("div", { className: "flex flex-col gap-3" },
                 React.createElement("button", { onClick: exportBackup, className: "rounded py-2 text-sm", style: { background: C.sage, color: C.bg, ...sans, fontWeight: 500 } }, "Exportar backup (JSON)"),
@@ -1230,6 +1349,7 @@ function SSMV() {
     const [hideFinance, setHideFinance] = useState(true);
     const [data, setData] = useState(loadInitialData);
     const [lastSaved, setLastSaved] = useState(null);
+    ACTIVE_CURRENCY = data.currency || "BRL";
     useEffect(() => {
         try {
             localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
@@ -1245,11 +1365,11 @@ function SSMV() {
         switch (tab) {
             case "registrar": return React.createElement(Registrar, { data: data, setData: setData });
             case "conhecimento": return React.createElement(Conhecimento, { data: data, setData: setData, period: period });
-            case "corpo": return React.createElement(Corpo, { data: data, period: period });
-            case "tempo": return React.createElement(Tempo, { data: data, period: period });
-            case "financeiro": return React.createElement(Financeiro, { data: data, hideFinance: hideFinance, setHideFinance: setHideFinance, period: period });
-            case "caridade": return React.createElement(Caridade, { data: data, period: period, hideFinance: hideFinance });
-            case "relatorios": return React.createElement(Relatorios, { data: data, period: period });
+            case "corpo": return React.createElement(Corpo, { data: data, setData: setData, period: period });
+            case "tempo": return React.createElement(Tempo, { data: data, setData: setData, period: period });
+            case "financeiro": return React.createElement(Financeiro, { data: data, setData: setData, hideFinance: hideFinance, setHideFinance: setHideFinance, period: period });
+            case "caridade": return React.createElement(Caridade, { data: data, setData: setData, period: period, hideFinance: hideFinance });
+            case "relatorios": return React.createElement(Relatorios, { data: data, period: period, hideFinance: hideFinance });
             case "curriculo": return React.createElement(Curriculo, { data: data, setData: setData });
             case "configuracoes": return React.createElement(Configuracoes, { lang: lang, setLang: setLang, data: data, setData: setData });
             default: return React.createElement(Dashboard, { data: data, hideFinance: hideFinance, period: period });
