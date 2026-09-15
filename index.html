@@ -83,28 +83,117 @@ function fmtDate(iso) { const d = new Date(iso + "T00:00:00"); return d.toLocale
 function monthYear(iso) { if (!iso)
     return ""; const d = new Date(iso + "T00:00:00"); return d.toLocaleDateString("pt-BR", { month: "short", year: "numeric" }); }
 function sum(arr) { return arr.reduce((a, b) => a + (Number(b) || 0), 0); }
-/* Formatação de números e moeda */
+/* ------------------------------------------------------------------ */
+/* NÚMEROS, MOEDA E DATAS — formatação no padrão brasileiro            */
+/* ------------------------------------------------------------------ */
 const CURRENCIES = {
-    BRL: { code: "BRL", locale: "pt-BR", label: "Real (R$)" },
-    USD: { code: "USD", locale: "en-US", label: "Dólar (US$)" },
-    EUR: { code: "EUR", locale: "de-DE", label: "Euro (€)" },
+    BRL: { code: "BRL", locale: "pt-BR", label: "Real (R$)", simbolo: "R$" },
+    USD: { code: "USD", locale: "en-US", label: "Dólar (US$)", simbolo: "US$" },
+    EUR: { code: "EUR", locale: "de-DE", label: "Euro (€)", simbolo: "€" },
 };
 let ACTIVE_CURRENCY = "BRL";
+/* Lê número digitado por humano: aceita "1.234,56", "1234,56", "1234.56", "R$ 1.234,56" */
+function parseNum(input) {
+    if (typeof input === "number")
+        return isFinite(input) ? input : 0;
+    if (!input)
+        return 0;
+    let t = String(input).trim().replace(/[R$US€\s]/gi, "");
+    const temVirgula = t.includes(",");
+    const temPonto = t.includes(".");
+    if (temVirgula && temPonto) {
+        // O último separador que aparece é o decimal
+        t = t.lastIndexOf(",") > t.lastIndexOf(".")
+            ? t.replace(/\./g, "").replace(",", ".")
+            : t.replace(/,/g, "");
+    }
+    else if (temVirgula) {
+        t = t.replace(",", ".");
+    }
+    else if (temPonto) {
+        // "1.234" com 3 dígitos após o ponto e sem outro ponto = separador de milhar
+        const partes = t.split(".");
+        if (partes.length === 2 && partes[1].length === 3 && partes[0].length <= 3)
+            t = partes.join("");
+    }
+    const n = parseFloat(t);
+    return isFinite(n) ? n : 0;
+}
+/* Moeda completa: R$ 1.234,56 */
 function money(v, currency) {
     const cur = CURRENCIES[currency || ACTIVE_CURRENCY] || CURRENCIES.BRL;
-    const n = Number(v) || 0;
-    return n.toLocaleString(cur.locale, { style: "currency", currency: cur.code });
+    return parseNum(v).toLocaleString(cur.locale, { style: "currency", currency: cur.code });
 }
+/* Moeda compacta para valores grandes: R$ 1,2 mi */
+function moneyCompact(v, currency) {
+    const cur = CURRENCIES[currency || ACTIVE_CURRENCY] || CURRENCIES.BRL;
+    const n = parseNum(v);
+    const abs = Math.abs(n);
+    if (abs < 1000000)
+        return money(n, currency);
+    const escalas = [
+        { limite: 1e12, div: 1e12, sufixo: " tri" },
+        { limite: 1e9, div: 1e9, sufixo: " bi" },
+        { limite: 1e6, div: 1e6, sufixo: " mi" },
+    ];
+    for (const e of escalas) {
+        if (abs >= e.limite) {
+            const valor = (n / e.div).toLocaleString("pt-BR", { minimumFractionDigits: 0, maximumFractionDigits: 2 });
+            return `${cur.simbolo} ${valor}${e.sufixo}`;
+        }
+    }
+    return money(n, currency);
+}
+/* Número simples: 1.234 ou 1.234,5 */
 function num(v, casas = 0) {
-    const n = Number(v) || 0;
-    return n.toLocaleString("pt-BR", { minimumFractionDigits: casas, maximumFractionDigits: casas });
+    return parseNum(v).toLocaleString("pt-BR", { minimumFractionDigits: casas, maximumFractionDigits: casas });
 }
+/* Número grande de forma legível: 1,2 mi */
+function numCompact(v) {
+    const n = parseNum(v);
+    const abs = Math.abs(n);
+    if (abs >= 1e12)
+        return `${(n / 1e12).toLocaleString("pt-BR", { maximumFractionDigits: 2 })} tri`;
+    if (abs >= 1e9)
+        return `${(n / 1e9).toLocaleString("pt-BR", { maximumFractionDigits: 2 })} bi`;
+    if (abs >= 1e6)
+        return `${(n / 1e6).toLocaleString("pt-BR", { maximumFractionDigits: 2 })} mi`;
+    if (abs >= 10000)
+        return n.toLocaleString("pt-BR", { maximumFractionDigits: 0 });
+    return n.toLocaleString("pt-BR", { maximumFractionDigits: 2 });
+}
+/* Quantidade de ativo: cripto pode ter fração mínima (0,00014 BTC) */
 function qty(v) {
-    const n = Number(v) || 0;
-    // cripto pode ter frações muito pequenas (0.00014 BTC)
+    const n = parseNum(v);
     if (n !== 0 && Math.abs(n) < 1)
         return n.toLocaleString("pt-BR", { maximumFractionDigits: 8 });
+    if (Math.abs(n) >= 1e6)
+        return numCompact(n);
     return n.toLocaleString("pt-BR", { maximumFractionDigits: 2 });
+}
+/* Duração em minutos vira "2h 15min" */
+function dur(minutos) {
+    const m = Math.round(parseNum(minutos));
+    if (m < 60)
+        return `${m} min`;
+    const h = Math.floor(m / 60), resto = m % 60;
+    return resto ? `${num(h)}h ${resto}min` : `${num(h)}h`;
+}
+/* Rótulo legível do período selecionado */
+function periodLabel(p) {
+    const d = new Date(p.ref + "T00:00:00");
+    if (p.type === "dia")
+        return d.toLocaleDateString("pt-BR", { day: "2-digit", month: "long" });
+    if (p.type === "semana") {
+        const ini = new Date(d);
+        ini.setDate(d.getDate() - d.getDay());
+        const fim = new Date(ini);
+        fim.setDate(ini.getDate() + 6);
+        return `${ini.toLocaleDateString("pt-BR", { day: "2-digit", month: "short" })} – ${fim.toLocaleDateString("pt-BR", { day: "2-digit", month: "short" })}`;
+    }
+    if (p.type === "mes")
+        return d.toLocaleDateString("pt-BR", { month: "long", year: "numeric" });
+    return String(d.getFullYear());
 }
 function inPeriod(dateIso, period) {
     if (!dateIso)
@@ -404,7 +493,8 @@ const PERIOD_LABELS = { dia: "Dia", semana: "Semana", mes: "Mês", ano: "Ano" };
 function PeriodFilter({ period, setPeriod }) {
     return (React.createElement("div", { className: "flex flex-wrap items-center gap-2 mb-5" },
         Object.entries(PERIOD_LABELS).map(([key, label]) => (React.createElement("button", { key: key, onClick: () => setPeriod({ ...period, type: key }), className: "text-xs px-3 py-1.5 rounded", style: { background: period.type === key ? C.sage : C.surface, color: period.type === key ? C.bg : C.textMuted, border: `1px solid ${C.border}`, ...sans } }, label))),
-        React.createElement("input", { type: "date", value: period.ref, onChange: (e) => setPeriod({ ...period, ref: e.target.value }), className: "text-xs p-1.5 rounded", style: inputStyle() })));
+        React.createElement("input", { type: "date", value: period.ref, onChange: (e) => setPeriod({ ...period, ref: e.target.value }), className: "text-xs p-1.5 rounded", style: inputStyle() }),
+        React.createElement("span", { className: "text-xs px-2", style: { ...sans, color: C.sage } }, periodLabel(period))));
 }
 /* ------------------------------------------------------------------ */
 /* REGISTRAR — campos dinâmicos, data e hora separadas                  */
@@ -427,31 +517,31 @@ function Registrar({ data, setData }) {
         let summary = category;
         if (domain === "financeiro" && category === "Conta bancária") {
             const isSaida = (values.operacao || "").toLowerCase().startsWith("sa");
-            const delta = isSaida ? -Number(values.valor || 0) : Number(values.valor || 0);
+            const delta = isSaida ? -parseNum(values.valor) : parseNum(values.valor);
             const acc = data.accounts.find((a) => a.name.toLowerCase() === (values.conta || "").toLowerCase());
             setData((d) => ({
                 ...d,
                 accounts: acc ? d.accounts.map((a) => a.id === acc.id ? { ...a, balance: a.balance + delta } : a)
                     : [...d.accounts, { id: Date.now(), name: values.conta, balance: delta }],
-                transactions: [...d.transactions, { id: Date.now(), date, conta: values.conta, operacao: isSaida ? "Saída" : "Entrada", categoria: "Manual", valor: Number(values.valor || 0) }],
+                transactions: [...d.transactions, { id: Date.now(), date, conta: values.conta, operacao: isSaida ? "Saída" : "Entrada", categoria: "Manual", valor: parseNum(values.valor) }],
             }));
             summary = `${values.operacao || ""} R$ ${values.valor || 0} — ${values.conta || ""}`;
         }
         if (domain === "financeiro" && category === "Criptomoeda") {
-            setData((d) => ({ ...d, cryptoPurchases: [...d.cryptoPurchases, { id: Date.now(), date, coin: (values.moeda || "").toUpperCase(), brlSpent: Number(values.valorPago || 0), quantity: Number(values.quantidade || 0) }] }));
+            setData((d) => ({ ...d, cryptoPurchases: [...d.cryptoPurchases, { id: Date.now(), date, coin: (values.moeda || "").toUpperCase(), brlSpent: parseNum(values.valorPago), quantity: parseNum(values.quantidade) }] }));
             summary = `Compra de ${values.quantidade || 0} ${values.moeda || ""} por R$ ${values.valorPago || 0}`;
         }
         if (domain === "financeiro" && category === "Ação / investimento") {
             const inv = data.investments.find((i) => i.name.toLowerCase() === (values.nome || "").toLowerCase());
-            setData((d) => ({ ...d, investments: inv ? d.investments.map((i) => i.id === inv.id ? { ...i, quantity: i.quantity + Number(values.quantidade || 0) } : i) : [...d.investments, { id: Date.now(), name: values.nome, quantity: Number(values.quantidade || 0) }] }));
+            setData((d) => ({ ...d, investments: inv ? d.investments.map((i) => i.id === inv.id ? { ...i, quantity: i.quantity + parseNum(values.quantidade) } : i) : [...d.investments, { id: Date.now(), name: values.nome, quantity: parseNum(values.quantidade) }] }));
             summary = `${values.quantidade || 0}x ${values.nome || ""}`;
         }
         if (domain === "conhecimento" && category === "Estudo") {
-            setData((d) => ({ ...d, studyRecords: [...d.studyRecords, { id: Date.now(), date, subject: values.materia || "Outros", pages: Number(values.paginas || 0) }] }));
+            setData((d) => ({ ...d, studyRecords: [...d.studyRecords, { id: Date.now(), date, subject: values.materia || "Outros", pages: parseNum(values.paginas) }] }));
             summary = `${values.materia || ""} — ${values.paginas || 0} páginas`;
         }
         if (domain === "conhecimento" && category === "Leitura") {
-            setData((d) => ({ ...d, reading: [...d.reading, { id: Date.now(), date, pages: Number(values.paginas || 0) }] }));
+            setData((d) => ({ ...d, reading: [...d.reading, { id: Date.now(), date, pages: parseNum(values.paginas) }] }));
             summary = `Leitura — ${values.paginas || 0} páginas`;
         }
         if (domain === "conhecimento" && category === "Skill desenvolvida") {
@@ -462,9 +552,9 @@ function Registrar({ data, setData }) {
             const acc = data.accounts.find((a) => a.name.toLowerCase() === (values.conta || "").toLowerCase());
             setData((d) => ({
                 ...d,
-                accounts: acc ? d.accounts.map((a) => a.id === acc.id ? { ...a, balance: a.balance - Number(values.valor || 0) } : a) : d.accounts,
-                transactions: [...d.transactions, { id: Date.now(), date, conta: values.conta, operacao: "Saída", categoria: "Doação", valor: Number(values.valor || 0) }],
-                charity: [...d.charity, { id: Date.now(), date, description: values.descricao || "Doação em dinheiro", valor: Number(values.valor || 0), conta: values.conta }],
+                accounts: acc ? d.accounts.map((a) => a.id === acc.id ? { ...a, balance: a.balance - parseNum(values.valor) } : a) : d.accounts,
+                transactions: [...d.transactions, { id: Date.now(), date, conta: values.conta, operacao: "Saída", categoria: "Doação", valor: parseNum(values.valor) }],
+                charity: [...d.charity, { id: Date.now(), date, description: values.descricao || "Doação em dinheiro", valor: parseNum(values.valor), conta: values.conta }],
             }));
             summary = `Doação de R$ ${values.valor || 0} — ${values.descricao || ""}`;
         }
@@ -473,27 +563,27 @@ function Registrar({ data, setData }) {
             summary = values.descricao || category;
         }
         if (domain === "tempo" && category === "Procrastinação") {
-            setData((d) => ({ ...d, procrastinationRecords: [...d.procrastinationRecords, { id: Date.now(), date, app: values.app || "Outro", minutes: Number(values.minutos || 0) }] }));
+            setData((d) => ({ ...d, procrastinationRecords: [...d.procrastinationRecords, { id: Date.now(), date, app: values.app || "Outro", minutes: parseNum(values.minutos) }] }));
             summary = `${values.minutos || 0} min em ${values.app || "outro app"}`;
         }
         if (domain === "corpo" && category === "Exercício") {
-            setData((d) => ({ ...d, exerciseRecords: [...d.exerciseRecords, { id: Date.now(), date, name: values.tipo || "Exercício", minutes: Number(values.minutos || 0) }] }));
+            setData((d) => ({ ...d, exerciseRecords: [...d.exerciseRecords, { id: Date.now(), date, name: values.tipo || "Exercício", minutes: parseNum(values.minutos) }] }));
             summary = `${values.tipo || "Exercício"} — ${values.minutos || 0} min`;
         }
         if (domain === "corpo" && category === "Água") {
-            setData((d) => ({ ...d, waterRecords: [...d.waterRecords, { id: Date.now(), date, liters: Number(values.ml || 0) }] }));
+            setData((d) => ({ ...d, waterRecords: [...d.waterRecords, { id: Date.now(), date, liters: parseNum(values.ml) }] }));
             summary = `Água — ${values.ml || 0} L`;
         }
         if (domain === "corpo" && category === "Sono") {
-            setData((d) => ({ ...d, sleep: [...d.sleep, { id: Date.now(), date, hours: Number(values.horas || 0) }] }));
+            setData((d) => ({ ...d, sleep: [...d.sleep, { id: Date.now(), date, hours: parseNum(values.horas) }] }));
             summary = `Sono — ${values.horas || 0}h`;
         }
         if (domain === "corpo" && category === "Peso") {
-            setData((d) => ({ ...d, weight: [...d.weight, { id: Date.now(), date, kg: Number(values.kg || 0) }] }));
+            setData((d) => ({ ...d, weight: [...d.weight, { id: Date.now(), date, kg: parseNum(values.kg) }] }));
             summary = `Peso — ${values.kg || 0} kg`;
         }
         if (domain === "corpo" && category === "Pressão arterial") {
-            setData((d) => ({ ...d, bloodPressure: [...d.bloodPressure, { id: Date.now(), date, sistolica: Number(values.sistolica || 0), diastolica: Number(values.diastolica || 0), bpm: Number(values.bpm || 0) }] }));
+            setData((d) => ({ ...d, bloodPressure: [...d.bloodPressure, { id: Date.now(), date, sistolica: parseNum(values.sistolica), diastolica: parseNum(values.diastolica), bpm: parseNum(values.bpm) }] }));
             summary = `Pressão — ${values.sistolica || 0}/${values.diastolica || 0}`;
         }
         if (domain === "corpo" && category === "Remédio / suplemento") {
@@ -505,7 +595,7 @@ function Registrar({ data, setData }) {
             summary = values.tipoRefeicao || "Refeição";
         }
         if (domain === "corpo" && category === "Alimentação avançada") {
-            setData((d) => ({ ...d, meals: [...d.meals, { id: Date.now(), date, tipo: values.alimento || "Refeição", calorias: Number(values.calorias || 0), proteinas: Number(values.proteinas || 0), carboidratos: Number(values.carboidratos || 0), gorduras: Number(values.gorduras || 0), detalhado: true }] }));
+            setData((d) => ({ ...d, meals: [...d.meals, { id: Date.now(), date, tipo: values.alimento || "Refeição", calorias: parseNum(values.calorias), proteinas: parseNum(values.proteinas), carboidratos: parseNum(values.carboidratos), gorduras: parseNum(values.gorduras), detalhado: true }] }));
             summary = `${values.alimento || ""} — ${values.calorias || 0} kcal`;
         }
         setFeed([{ id: Date.now(), date, time, summary }, ...feed]);
@@ -524,7 +614,7 @@ function Registrar({ data, setData }) {
                         React.createElement("select", { value: category, onChange: (e) => { setCategory(e.target.value); setValues({}); }, className: "w-full p-2 rounded", style: inputStyle() }, Object.keys(CATEGORY_FIELDS[domain]).map((c) => React.createElement("option", { key: c, value: c }, c))))),
                 fields.map((f) => (React.createElement("div", { key: f.key },
                     React.createElement("label", { className: "text-xs block mb-1", style: { ...sans, color: C.textMuted } }, f.label),
-                    React.createElement("input", { type: f.type, value: values[f.key] || "", onChange: (e) => setValues({ ...values, [f.key]: e.target.value }), className: "w-full p-2 rounded", style: inputStyle() }),
+                    React.createElement("input", { type: f.type === "number" ? "text" : f.type, inputMode: f.type === "number" ? "decimal" : undefined, placeholder: f.type === "number" ? "ex: 1.234,56" : undefined, value: values[f.key] || "", onChange: (e) => setValues({ ...values, [f.key]: e.target.value }), className: "w-full p-2 rounded", style: inputStyle() }),
                     domain === "tempo" && category === "Procrastinação" && f.key === "app" && (React.createElement("div", { className: "flex flex-wrap gap-1 mt-2" }, ["Instagram", "TikTok", "Facebook", "YouTube", "Jogos", "Conversas com IA", "Outro"].map((opt) => (React.createElement("button", { key: opt, type: "button", onClick: () => setValues({ ...values, app: opt }), className: "text-xs px-2 py-1 rounded", style: { background: C.surfaceAlt, color: C.textMuted, border: `1px solid ${C.border}`, ...sans } }, opt)))))))),
                 React.createElement("div", { className: "grid grid-cols-2 gap-3" },
                     React.createElement("div", null,
@@ -549,7 +639,6 @@ function Registrar({ data, setData }) {
 function Dashboard({ data, hideFinance, period }) {
     const cfg = data.dashboardConfig;
     const p = period.value;
-    const now = new Date();
     const pReading = data.reading.filter((r) => inPeriod(r.date, p));
     const pExercise = data.exerciseRecords.filter((r) => inPeriod(r.date, p));
     const pSleep = data.sleep.filter((r) => inPeriod(r.date, p));
@@ -559,24 +648,19 @@ function Dashboard({ data, hideFinance, period }) {
     const pCharity = data.charity.filter((c) => inPeriod(c.date, p));
     const totalBalance = sum(data.accounts.map((a) => a.balance));
     const doacaoValor = sum(pCharity.filter((c) => c.valor).map((c) => c.valor));
-    // Livros lidos: contagem fixa do mês corrente — não muda com o filtro de período.
-    const livrosEsteMes = data.books.filter((b) => {
-        if (b.status !== "concluído" || !b.dataConclusao)
-            return false;
-        const d = new Date(b.dataConclusao + "T00:00:00");
-        return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth();
-    }).length;
+    // Livros concluídos dentro do período selecionado
+    const livrosPeriodo = data.books.filter((b) => b.status === "concluído" && b.dataConclusao && inPeriod(b.dataConclusao, p)).length;
     const cards = [];
     if (cfg.financeiro)
-        cards.push(React.createElement(StatCard, { key: "fin", icon: Wallet, label: "Financeiro", value: React.createElement(PrivacyValue, { hide: hideFinance }, money(totalBalance)), sub: "total em contas", accent: C.bronze }));
+        cards.push(React.createElement(StatCard, { key: "fin", icon: Wallet, label: "Financeiro", value: React.createElement(PrivacyValue, { hide: hideFinance }, moneyCompact(totalBalance)), sub: "total em contas", accent: C.bronze }));
     if (cfg.doacaoModo !== "oculto")
         cards.push(React.createElement(StatCard, { key: "car", icon: HeartHandshake, label: "Caridade", value: cfg.doacaoModo === "valor" ? React.createElement(PrivacyValue, { hide: hideFinance }, money(doacaoValor)) : pCharity.length, sub: cfg.doacaoModo === "valor" ? "doado no período" : "ações no período", accent: C.bronze }));
     if (cfg.leitura)
-        cards.push(React.createElement(StatCard, { key: "lei", icon: BookOpen, label: "Leitura", value: `${num(sum(pReading.map((r) => r.pages)))} pág.`, sub: "no per\u00EDodo" }));
+        cards.push(React.createElement(StatCard, { key: "lei", icon: BookOpen, label: "Leitura", value: `${num(sum(pReading.map((r) => r.pages)))} pág.`, sub: periodLabel(p) }));
     if (cfg.livros)
-        cards.push(React.createElement(StatCard, { key: "liv", icon: BookOpen, label: "Livros lidos", value: livrosEsteMes, sub: now.toLocaleDateString("pt-BR", { month: "long" }) }));
+        cards.push(React.createElement(StatCard, { key: "liv", icon: BookOpen, label: "Livros lidos", value: livrosPeriodo, sub: periodLabel(p) }));
     if (cfg.exercicio)
-        cards.push(React.createElement(StatCard, { key: "exe", icon: Activity, label: "Exerc\u00EDcio", value: `${num(sum(pExercise.map((r) => r.minutes)))} min`, sub: "no per\u00EDodo", accent: C.bronze }));
+        cards.push(React.createElement(StatCard, { key: "exe", icon: Activity, label: "Exerc\u00EDcio", value: dur(sum(pExercise.map((r) => r.minutes))), sub: periodLabel(p), accent: C.bronze }));
     if (cfg.sono)
         cards.push(React.createElement(StatCard, { key: "son", icon: Moon, label: "Sono", value: pSleep.length ? `${(sum(pSleep.map((r) => r.hours)) / pSleep.length).toFixed(1)}h` : "—", sub: "m\u00E9dia no per\u00EDodo" }));
     if (cfg.peso)
@@ -642,7 +726,7 @@ function Conhecimento({ data, setData, period }) {
         e.preventDefault();
         if (!form.title)
             return;
-        setData((d) => ({ ...d, books: [...d.books, { id: Date.now(), title: form.title, author: form.author, tema: form.tema, totalPages: Number(form.totalPages || 0), pagesRead: Number(form.pagesRead || 0), status: "lendo" }] }));
+        setData((d) => ({ ...d, books: [...d.books, { id: Date.now(), title: form.title, author: form.author, tema: form.tema, totalPages: parseNum(form.totalPages), pagesRead: parseNum(form.pagesRead), status: "lendo" }] }));
         setForm({ title: "", author: "", tema: "", totalPages: "", pagesRead: "" });
     }
     return (React.createElement("div", null,
@@ -673,7 +757,7 @@ function Conhecimento({ data, setData, period }) {
                                 pct,
                                 "%"),
                             React.createElement("span", { className: "flex items-center gap-1 no-print" },
-                                React.createElement("input", { type: "number", value: b.pagesRead, onChange: (e) => setData((d) => ({ ...d, books: d.books.map((x) => x.id === b.id ? { ...x, pagesRead: Number(e.target.value || 0), status: Number(e.target.value || 0) >= x.totalPages ? "concluído" : "lendo", dataConclusao: Number(e.target.value || 0) >= x.totalPages ? (x.dataConclusao || todayIso()) : undefined } : x) })), className: "w-16 px-1 py-0.5 rounded text-xs", style: inputStyle(), title: "Atualizar p\u00E1ginas lidas" }))))));
+                                React.createElement("input", { type: "text", inputMode: "numeric", value: b.pagesRead, onChange: (e) => setData((d) => ({ ...d, books: d.books.map((x) => x.id === b.id ? { ...x, pagesRead: parseNum(e.target.value), status: parseNum(e.target.value) >= x.totalPages ? "concluído" : "lendo", dataConclusao: parseNum(e.target.value) >= x.totalPages ? (x.dataConclusao || todayIso()) : undefined } : x) })), className: "w-16 px-1 py-0.5 rounded text-xs", style: inputStyle(), title: "Atualizar p\u00E1ginas lidas" }))))));
             }),
             data.books.length === 0 && React.createElement(Panel, null,
                 React.createElement("div", { className: "text-sm", style: { color: C.textMuted, ...sans } }, "Nenhum livro cadastrado."))),
@@ -693,8 +777,8 @@ function Conhecimento({ data, setData, period }) {
                 React.createElement("input", { placeholder: "T\u00EDtulo", value: form.title, onChange: (e) => setForm({ ...form, title: e.target.value }), className: "p-2 rounded col-span-2", style: inputStyle() }),
                 React.createElement("input", { placeholder: "Autor", value: form.author, onChange: (e) => setForm({ ...form, author: e.target.value }), className: "p-2 rounded", style: inputStyle() }),
                 React.createElement("input", { placeholder: "Tema", value: form.tema, onChange: (e) => setForm({ ...form, tema: e.target.value }), className: "p-2 rounded", style: inputStyle() }),
-                React.createElement("input", { placeholder: "Total de p\u00E1ginas", type: "number", value: form.totalPages, onChange: (e) => setForm({ ...form, totalPages: e.target.value }), className: "p-2 rounded", style: inputStyle() }),
-                React.createElement("input", { placeholder: "P\u00E1ginas j\u00E1 lidas", type: "number", value: form.pagesRead, onChange: (e) => setForm({ ...form, pagesRead: e.target.value }), className: "p-2 rounded", style: inputStyle() }),
+                React.createElement("input", { placeholder: "Total de p\u00E1ginas", type: "text", inputMode: "numeric", value: form.totalPages, onChange: (e) => setForm({ ...form, totalPages: e.target.value }), className: "p-2 rounded", style: inputStyle() }),
+                React.createElement("input", { placeholder: "P\u00E1ginas j\u00E1 lidas", type: "text", inputMode: "numeric", value: form.pagesRead, onChange: (e) => setForm({ ...form, pagesRead: e.target.value }), className: "p-2 rounded", style: inputStyle() }),
                 React.createElement("button", { type: "submit", className: "col-span-2 rounded py-2", style: { background: C.sage, color: C.bg, ...sans, fontWeight: 500 } }, "Adicionar"))),
         React.createElement("div", { className: "grid md:grid-cols-2 gap-4 mb-6" },
             React.createElement(Panel, null,
@@ -740,7 +824,7 @@ function Corpo({ data, setData, period }) {
         React.createElement(SectionTitle, { sub: "Exerc\u00EDcio, sono, \u00E1gua, peso, press\u00E3o, rem\u00E9dios e alimenta\u00E7\u00E3o" }, "Corpo"),
         React.createElement(PeriodFilter, { period: period.value, setPeriod: period.set }),
         React.createElement("div", { className: "grid grid-cols-2 md:grid-cols-4 gap-4 mb-6" },
-            React.createElement(StatCard, { icon: Activity, label: "Exerc\u00EDcio no per\u00EDodo", value: `${num(totalMinutes)} min` }),
+            React.createElement(StatCard, { icon: Activity, label: "Exerc\u00EDcio no per\u00EDodo", value: dur(totalMinutes) }),
             React.createElement(StatCard, { icon: Moon, label: "Sono m\u00E9dio", value: sonoMedia !== null ? `${sonoMedia.toFixed(1)}h` : "—", accent: C.bronze }),
             React.createElement(StatCard, { icon: Droplet, label: "\u00C1gua (m\u00E9dia)", value: aguaMedia !== null ? `${aguaMedia.toFixed(1)} L` : "—" }),
             React.createElement(StatCard, { icon: Activity, label: "Peso", value: pesoAtual !== null ? `${num(pesoAtual, 1)} kg` : "—", accent: C.bronze })),
@@ -751,9 +835,7 @@ function Corpo({ data, setData, period }) {
                     exChart.map((e) => (React.createElement("div", { key: e.name },
                         React.createElement("div", { className: "flex justify-between text-xs mb-1", style: { ...sans, color: C.text } },
                             React.createElement("span", null, e.name),
-                            React.createElement("span", { style: { color: C.textMuted } },
-                                num(e.minutes),
-                                " min")),
+                            React.createElement("span", { style: { color: C.textMuted } }, dur(e.minutes))),
                         React.createElement("div", { className: "h-1.5 rounded-full", style: { background: C.surfaceAlt } },
                             React.createElement("div", { className: "h-1.5 rounded-full", style: { width: `${Math.round((e.minutes / maxEx) * 100)}%`, background: C.sage } }))))),
                     exChart.length === 0 && React.createElement("div", { className: "text-sm", style: { color: C.textMuted, ...sans } }, "Nenhum exerc\u00EDcio neste per\u00EDodo."))),
@@ -781,7 +863,7 @@ function Corpo({ data, setData, period }) {
         React.createElement(Panel, null,
             React.createElement(SectionTitle, null, "Exerc\u00EDcio, sono, \u00E1gua e peso no per\u00EDodo"),
             React.createElement("div", { className: "flex flex-col gap-1 text-sm", style: sans },
-                pExercise.map((r) => React.createElement(RecordRow, { key: "e" + r.id, left: r.name, right: `${num(r.minutes)} min — ${fmtDate(r.date)}`, onDelete: () => remove("exerciseRecords", (x) => x.id !== r.id) })),
+                pExercise.map((r) => React.createElement(RecordRow, { key: "e" + r.id, left: r.name, right: `${dur(r.minutes)} — ${fmtDate(r.date)}`, onDelete: () => remove("exerciseRecords", (x) => x.id !== r.id) })),
                 pSleep.map((r) => React.createElement(RecordRow, { key: "s" + r.id, left: "Sono", right: `${num(r.hours, 1)}h — ${fmtDate(r.date)}`, onDelete: () => remove("sleep", (x) => x.id !== r.id) })),
                 pWeight.map((r) => React.createElement(RecordRow, { key: "w" + r.id, left: "Peso", right: `${num(r.kg, 1)} kg — ${fmtDate(r.date)}`, onDelete: () => remove("weight", (x) => x.id !== r.id) })),
                 pWater.map((r) => React.createElement(RecordRow, { key: "a" + r.id, left: "\u00C1gua", right: `${num(r.liters, 1)} L — ${fmtDate(r.date)}`, onDelete: () => remove("waterRecords", (x) => x.id !== r.id) })),
@@ -823,9 +905,9 @@ function Tempo({ data, setData, period }) {
                     ? React.createElement(MiniBar, { data: appChart, dataKey: "minutes", color: C.bronze })
                     : React.createElement("div", { className: "text-sm", style: { color: C.textMuted, ...sans } }, "Nenhum registro neste per\u00EDodo.")),
             React.createElement(Panel, null,
-                React.createElement(SectionTitle, { sub: `Total: ${num(procrastMin)} min` }, "Registros do per\u00EDodo"),
+                React.createElement(SectionTitle, { sub: `Total: ${dur(procrastMin)}` }, "Registros do per\u00EDodo"),
                 React.createElement("div", { className: "flex flex-col gap-1 text-sm", style: sans },
-                    pProcrastination.map((r) => (React.createElement(RecordRow, { key: r.id, left: r.app, right: `${num(r.minutes)} min — ${fmtDate(r.date)}`, onDelete: () => remove("procrastinationRecords", (x) => x.id !== r.id) }))),
+                    pProcrastination.map((r) => (React.createElement(RecordRow, { key: r.id, left: r.app, right: `${dur(r.minutes)} — ${fmtDate(r.date)}`, onDelete: () => remove("procrastinationRecords", (x) => x.id !== r.id) }))),
                     pProcrastination.length === 0 && React.createElement("div", { style: { color: C.textMuted } }, "Nenhum registro neste per\u00EDodo."))))));
 }
 const COINGECKO_IDS = { SHIB: "shiba-inu", BTC: "bitcoin", ETH: "ethereum", DOGE: "dogecoin", SOL: "solana", ADA: "cardano", XRP: "ripple", BNB: "binancecoin" };
@@ -895,7 +977,7 @@ function Financeiro({ data, setData, hideFinance, setHideFinance, period }) {
             React.createElement(Panel, null,
                 React.createElement(SectionTitle, { sub: "Total em contas de banco e carteiras" },
                     "Contas \u2014 ",
-                    React.createElement(PrivacyValue, { hide: hideFinance }, money(totalBalance))),
+                    React.createElement(PrivacyValue, { hide: hideFinance }, moneyCompact(totalBalance))),
                 React.createElement("div", { className: "flex flex-col gap-2" },
                     data.accounts.map((a) => (React.createElement("div", { key: a.id, className: "flex justify-between items-center gap-2 text-sm", style: { ...sans, color: C.text } },
                         React.createElement("span", { className: "flex-1 min-w-0" }, a.name),
@@ -903,9 +985,9 @@ function Financeiro({ data, setData, hideFinance, setHideFinance, period }) {
                             React.createElement(PrivacyValue, { hide: hideFinance }, money(a.balance))),
                         React.createElement("span", { className: "flex gap-1 no-print" },
                             React.createElement("button", { onClick: () => { const v = prompt(`Adicionar quanto em ${a.name}?`); if (v)
-                                    ajustarConta(a.id, Math.abs(Number(v.replace(",", ".")) || 0)); }, className: "px-1.5 rounded text-xs", style: { background: "transparent", color: C.sage, border: `1px solid ${C.border}` }, title: "Adicionar" }, "+"),
+                                    ajustarConta(a.id, Math.abs(parseNum(v))); }, className: "px-1.5 rounded text-xs", style: { background: "transparent", color: C.sage, border: `1px solid ${C.border}` }, title: "Adicionar" }, "+"),
                             React.createElement("button", { onClick: () => { const v = prompt(`Remover quanto de ${a.name}?`); if (v)
-                                    ajustarConta(a.id, -Math.abs(Number(v.replace(",", ".")) || 0)); }, className: "px-1.5 rounded text-xs", style: { background: "transparent", color: C.bronze, border: `1px solid ${C.border}` }, title: "Remover" }, "\u2212"),
+                                    ajustarConta(a.id, -Math.abs(parseNum(v))); }, className: "px-1.5 rounded text-xs", style: { background: "transparent", color: C.bronze, border: `1px solid ${C.border}` }, title: "Remover" }, "\u2212"),
                             React.createElement("button", { onClick: () => remove("accounts", (x) => x.id !== a.id), className: "px-1.5 rounded text-xs", style: { background: "transparent", color: C.danger, border: `1px solid ${C.border}` }, title: "Apagar conta" }, "\u2715"))))),
                     data.accounts.length === 0 && React.createElement("div", { className: "text-sm", style: { color: C.textMuted } }, "Nenhuma conta cadastrada."))),
             React.createElement(Panel, null,
@@ -966,7 +1048,7 @@ function Caridade({ data, setData, period, hideFinance }) {
         React.createElement(PeriodFilter, { period: period.value, setPeriod: period.set }),
         React.createElement("div", { className: "grid grid-cols-2 gap-4 mb-4" },
             React.createElement(StatCard, { icon: HeartHandshake, label: "A\u00E7\u00F5es no per\u00EDodo", value: pCharity.length }),
-            React.createElement(StatCard, { icon: Wallet, label: "Doado no per\u00EDodo", value: React.createElement(PrivacyValue, { hide: hideFinance }, money(totalDoado)), accent: C.bronze })),
+            React.createElement(StatCard, { icon: Wallet, label: "Doado no per\u00EDodo", value: React.createElement(PrivacyValue, { hide: hideFinance }, moneyCompact(totalDoado)), accent: C.bronze })),
         React.createElement(Panel, null,
             React.createElement("div", { className: "flex flex-col gap-2" },
                 pCharity.map((c) => (React.createElement(RecordRow, { key: c.id, left: `${c.description}${c.conta ? ` (via ${c.conta})` : ""}`, right: React.createElement("span", null,
@@ -1043,9 +1125,9 @@ function Relatorios({ data, period, hideFinance }) {
         React.createElement("div", { className: "print-area" },
             React.createElement("div", { className: "grid grid-cols-2 md:grid-cols-4 gap-4 mb-6" },
                 React.createElement(StatCard, { icon: BookOpen, label: "Livros conclu\u00EDdos", value: livrosPeriodo, sub: `neste ${nome}` }),
-                React.createElement(StatCard, { icon: HeartHandshake, label: "Doa\u00E7\u00F5es", value: React.createElement(PrivacyValue, { hide: hideFinance }, money(doacoesPeriodo)), sub: `neste ${nome}`, accent: C.bronze }),
+                React.createElement(StatCard, { icon: HeartHandshake, label: "Doa\u00E7\u00F5es", value: React.createElement(PrivacyValue, { hide: hideFinance }, moneyCompact(doacoesPeriodo)), sub: `neste ${nome}`, accent: C.bronze }),
                 React.createElement(StatCard, { icon: Activity, label: "Peso", value: pWeight.length ? `${num(pWeight[pWeight.length - 1].kg, 1)} kg` : "—", sub: `neste ${nome}` }),
-                React.createElement(StatCard, { icon: Smartphone, label: "Redes sociais", value: `${num(procrastinacaoPeriodo)} min`, sub: `neste ${nome}`, accent: C.bronze })),
+                React.createElement(StatCard, { icon: Smartphone, label: "Redes sociais", value: dur(procrastinacaoPeriodo), sub: `neste ${nome}`, accent: C.bronze })),
             React.createElement("div", { className: "grid md:grid-cols-2 gap-4 mb-4" },
                 React.createElement(Panel, null,
                     React.createElement(SectionTitle, { sub: `Total de páginas por ${nome} selecionado` }, "Leitura"),
@@ -1194,7 +1276,7 @@ function Curriculo({ data, setData }) {
                             React.createElement("input", { type: "date", value: form.dataFim, onChange: (e) => setForm({ ...form, dataFim: e.target.value }), className: "w-full p-2 rounded", style: inputStyle() }))),
                     !isFormacao && (React.createElement("div", null,
                         React.createElement("label", { className: "text-xs block mb-1", style: { color: C.textMuted, ...sans } }, "Carga hor\u00E1ria (horas)"),
-                        React.createElement("input", { type: "number", value: form.horas, onChange: (e) => setForm({ ...form, horas: e.target.value }), className: "w-full p-2 rounded", style: inputStyle() }))),
+                        React.createElement("input", { type: "text", inputMode: "numeric", value: form.horas, onChange: (e) => setForm({ ...form, horas: e.target.value }), className: "w-full p-2 rounded", style: inputStyle() }))),
                     isFormacao && React.createElement("p", { className: "text-xs", style: { color: C.textMuted, ...sans } }, "A dura\u00E7\u00E3o em anos \u00E9 calculada a partir das datas."),
                     React.createElement("button", { type: "submit", className: "rounded py-2", style: { background: C.sage, color: C.bg, ...sans, fontWeight: 500 } }, "Adicionar"))))));
 }
