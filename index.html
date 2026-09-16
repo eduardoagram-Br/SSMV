@@ -220,11 +220,12 @@ function inPeriod(dateIso, period) {
 /* ------------------------------------------------------------------ */
 const initialData = {
     currency: "BRL",
+    curriculoConfig: { mostrarIdiomas: true },
     dashboardConfig: {
         leitura: true, exercicio: true, sono: false, peso: false, pressao: false,
         livros: true, estado: false, financeiro: true, doacaoModo: "contagem",
     },
-    profile: { nome: "Beatriz Andrade", cargo: "Analista Administrativa", dataNascimento: "1994-03-12", telefone: "(21) 99999-0000", email: "beatriz@example.com", cidade: "Niterói, RJ", resumo: "Profissional de administração com foco em processos e análise de dados. Em formação continuada por conta própria." },
+    profile: { nome: "Beatriz Andrade", cargo: "Analista Administrativa", dataNascimento: "1994-03-12", telefone: "(21) 99999-0000", email: "beatriz@example.com", cidade: "Niterói, RJ", objetivo: "Profissional de administração com foco em processos e análise de dados, em busca de posições que unam organização e tecnologia. Em formação continuada por conta própria." },
     books: [
         { id: 1, title: "Hábitos Atômicos", author: "James Clear", tema: "Desenvolvimento pessoal", totalPages: 320, pagesRead: 208, status: "lendo" },
         { id: 2, title: "Sapiens", author: "Yuval Noah Harari", tema: "História", totalPages: 464, pagesRead: 464, status: "concluído", dataConclusao: isoDaysAgo(45) },
@@ -639,6 +640,7 @@ function Registrar({ data, setData }) {
 function Dashboard({ data, hideFinance, period }) {
     const cfg = data.dashboardConfig;
     const p = period.value;
+    const [chartType, setChartType] = useState("linha");
     const pReading = data.reading.filter((r) => inPeriod(r.date, p));
     const pExercise = data.exerciseRecords.filter((r) => inPeriod(r.date, p));
     const pSleep = data.sleep.filter((r) => inPeriod(r.date, p));
@@ -677,17 +679,26 @@ function Dashboard({ data, hideFinance, period }) {
                 " Exportar / imprimir")),
         React.createElement("div", { className: "no-print" },
             React.createElement(PeriodFilter, { period: period.value, setPeriod: period.set })),
+        React.createElement("div", { className: "flex items-center gap-2 mb-3 no-print" },
+            React.createElement("span", { className: "text-xs", style: { ...sans, color: C.textMuted } }, "Gr\u00E1fico:"),
+            [["linha", "Linha"], ["barra", "Barra"]].map(([key, label]) => (React.createElement("button", { key: key, onClick: () => setChartType(key), className: "text-xs px-3 py-1 rounded", style: { background: chartType === key ? C.sage : C.surface, color: chartType === key ? C.bg : C.textMuted, border: `1px solid ${C.border}`, ...sans } }, label)))),
         React.createElement("div", { className: "print-area" },
             React.createElement("div", { className: "grid grid-cols-2 md:grid-cols-3 gap-4 mb-6" }, cards),
             React.createElement("div", { className: "grid md:grid-cols-2 gap-4" },
                 React.createElement(Panel, null,
                     React.createElement(SectionTitle, { sub: "\u00DAltimas duas semanas" }, "Trajet\u00F3ria de leitura"),
-                    React.createElement(MiniLine, { data: data.reading.map(r => ({ ...r, date: fmtDate(r.date) })), dataKey: "pages", color: C.sage })),
+                    chartType === "linha"
+                        ? React.createElement(MiniLine, { data: data.reading.map(r => ({ ...r, date: fmtDate(r.date) })), dataKey: "pages", color: C.sage })
+                        : React.createElement(MiniBar, { data: data.reading.map(r => ({ ...r, date: fmtDate(r.date) })), dataKey: "pages", color: C.sage, xKey: "date" })),
                 cfg.sono ? (React.createElement(Panel, null,
                     React.createElement(SectionTitle, { sub: "\u00DAltimas duas semanas" }, "Trajet\u00F3ria de sono"),
-                    React.createElement(MiniLine, { data: data.sleep.map(s => ({ ...s, date: fmtDate(s.date) })), dataKey: "hours", color: C.bronze }))) : (React.createElement(Panel, null,
+                    chartType === "linha"
+                        ? React.createElement(MiniLine, { data: data.sleep.map(s => ({ ...s, date: fmtDate(s.date) })), dataKey: "hours", color: C.bronze })
+                        : React.createElement(MiniBar, { data: data.sleep.map(s => ({ ...s, date: fmtDate(s.date) })), dataKey: "hours", color: C.bronze, xKey: "date" }))) : (React.createElement(Panel, null,
                     React.createElement(SectionTitle, { sub: "\u00DAltimos 4 registros" }, "Trajet\u00F3ria de peso"),
-                    React.createElement(MiniLine, { data: data.weight.map(w => ({ date: fmtDate(w.date), kg: w.kg })), dataKey: "kg", color: C.bronze })))))));
+                    chartType === "linha"
+                        ? React.createElement(MiniLine, { data: data.weight.map(w => ({ date: fmtDate(w.date), kg: w.kg })), dataKey: "kg", color: C.bronze })
+                        : React.createElement(MiniBar, { data: data.weight.map(w => ({ date: fmtDate(w.date), kg: w.kg })), dataKey: "kg", color: C.bronze, xKey: "date" })))))));
 }
 function Conhecimento({ data, setData, period }) {
     const remove = useRemover(setData);
@@ -1173,83 +1184,104 @@ function Relatorios({ data, period, hideFinance }) {
                     ? React.createElement(MiniLine, { data: data.weight.map((w) => ({ date: fmtDate(w.date), kg: w.kg })), dataKey: "kg", color: C.bronze })
                     : React.createElement("div", { className: "text-sm", style: { color: C.textMuted, ...sans } }, "Nenhum registro de peso.")))));
 }
+/* Seção de currículo em formato de documento — sem caixinhas, com linha divisória */
+function ResumeSection({ title, children, className }) {
+    return (React.createElement("div", { className: `mb-6 ${className || ""}` },
+        React.createElement("div", { className: "text-xs mb-2", style: { ...sans, color: C.sage, letterSpacing: "0.08em", textTransform: "uppercase", fontWeight: 600 } }, title),
+        React.createElement("div", { style: { borderTop: `1px solid ${C.border}`, paddingTop: 10 } }, children)));
+}
+function ResumeItem({ titulo, subtitulo, meta, descricao, onDelete }) {
+    return (React.createElement("div", { className: "mb-3 group" },
+        React.createElement("div", { className: "flex justify-between items-start gap-2" },
+            React.createElement("div", { className: "min-w-0" },
+                React.createElement("div", { className: "text-sm", style: { ...sans, color: C.text, fontWeight: 500 } }, titulo),
+                subtitulo && React.createElement("div", { className: "text-xs", style: { ...sans, color: C.textMuted } }, subtitulo)),
+            React.createElement("div", { className: "flex items-center gap-2 shrink-0" },
+                meta && React.createElement("span", { className: "text-xs", style: { ...sans, color: C.textMuted } }, meta),
+                onDelete && React.createElement("button", { onClick: onDelete, className: "px-1.5 rounded text-xs no-print", style: { background: "transparent", color: C.danger, border: `1px solid ${C.border}` }, title: "Apagar" }, "\u2715"))),
+        descricao && React.createElement("p", { className: "text-xs mt-1", style: { ...sans, color: C.textMuted } }, descricao)));
+}
 function Curriculo({ data, setData }) {
     const remove = useRemover(setData);
-    const [form, setForm] = useState({ tipo: "Certificado", titulo: "", instituicao: "", dataInicio: "", dataFim: "", horas: "", descricao: "" });
+    const [form, setForm] = useState({ tipo: "Experiência", titulo: "", instituicao: "", dataInicio: "", dataFim: "", horas: "", descricao: "" });
     const [profileEdit, setProfileEdit] = useState(data.profile);
     function addItem(e) {
         e.preventDefault();
         if (!form.titulo)
             return;
         setData((d) => ({ ...d, diplomas: [...d.diplomas, { id: Date.now(), ...form }] }));
-        setForm({ tipo: "Certificado", titulo: "", instituicao: "", dataInicio: "", dataFim: "", horas: "", descricao: "" });
+        setForm({ tipo: form.tipo, titulo: "", instituicao: "", dataInicio: "", dataFim: "", horas: "", descricao: "" });
     }
     function saveProfile(e) {
         e.preventDefault();
         setData((d) => ({ ...d, profile: profileEdit }));
     }
-    const ORDEM = ["Formação", "Pós-graduação", "Experiência", "Curso", "Certificado", "Idioma"];
-    const grouped = {};
-    data.diplomas.forEach((d) => { grouped[d.tipo] = grouped[d.tipo] || []; grouped[d.tipo].push(d); });
-    const tiposOrdenados = ORDEM.filter((t) => grouped[t]).concat(Object.keys(grouped).filter((t) => !ORDEM.includes(t)));
-    const isFormacao = form.tipo === "Formação" || form.tipo === "Pós-graduação" || form.tipo === "Experiência";
+    function onFotoChange(e) {
+        const file = e.target.files[0];
+        if (!file)
+            return;
+        const reader = new FileReader();
+        reader.onload = (ev) => setProfileEdit((p) => ({ ...p, foto: ev.target.result }));
+        reader.readAsDataURL(file);
+    }
+    function toggleIdiomas() {
+        setData((d) => ({ ...d, curriculoConfig: { ...d.curriculoConfig, mostrarIdiomas: !d.curriculoConfig.mostrarIdiomas } }));
+    }
+    const porTipo = {};
+    data.diplomas.forEach((d) => { porTipo[d.tipo] = porTipo[d.tipo] || []; porTipo[d.tipo].push(d); });
+    const ordenarPorData = (lista) => [...lista].sort((a, b) => (b.dataInicio || "").localeCompare(a.dataInicio || ""));
+    const SECOES = [
+        { titulo: "Experiências", tipos: ["Experiência"] },
+        { titulo: "Ensino", tipos: ["Formação", "Pós-graduação"] },
+        { titulo: "Idiomas", tipos: ["Idioma"], opcional: true },
+        { titulo: "Cursos", tipos: ["Curso", "Certificado"] },
+    ];
     const idade = data.profile.dataNascimento
         ? Math.floor((Date.now() - new Date(data.profile.dataNascimento + "T00:00:00").getTime()) / (1000 * 60 * 60 * 24 * 365.25))
         : null;
-    const totalHoras = sum(data.diplomas.filter((d) => d.horas).map((d) => d.horas));
-    const livrosLidos = data.books.filter((b) => b.status === "concluído").length;
+    const cfgCv = data.curriculoConfig || { mostrarIdiomas: true };
     return (React.createElement("div", null,
         React.createElement("div", { className: "flex justify-between items-center mb-4 no-print" },
-            React.createElement(SectionTitle, { sub: "Dados pessoais, forma\u00E7\u00E3o, experi\u00EAncias e habilidades \u2014 pronto para impress\u00E3o" }, "Curr\u00EDculo"),
+            React.createElement(SectionTitle, { sub: "Dados pessoais, objetivo, experi\u00EAncias e forma\u00E7\u00E3o \u2014 pronto para impress\u00E3o" }, "Curr\u00EDculo"),
             React.createElement("button", { onClick: () => window.print(), className: "flex items-center gap-1 text-xs px-3 py-1.5 rounded h-fit", style: { background: C.sage, color: C.bg, ...sans } },
                 React.createElement(Printer, { size: 13 }),
                 " Imprimir")),
-        React.createElement("div", { className: "print-area" },
-            React.createElement("div", { className: "mb-6 pb-4", style: { borderBottom: `1px solid ${C.border}` } },
-                React.createElement("div", { style: { ...serif, fontSize: 26, color: C.text } }, data.profile.nome || "Seu nome"),
-                data.profile.cargo && React.createElement("div", { className: "text-sm mt-1", style: { ...sans, color: C.sage } }, data.profile.cargo),
-                React.createElement("div", { className: "text-sm mt-2", style: { ...sans, color: C.textMuted } },
-                    idade !== null && `${idade} anos`,
-                    idade !== null && (data.profile.telefone || data.profile.email) ? " · " : "",
-                    data.profile.telefone,
-                    data.profile.telefone && data.profile.email ? " · " : "",
-                    data.profile.email),
-                data.profile.cidade && React.createElement("div", { className: "text-sm", style: { ...sans, color: C.textMuted } }, data.profile.cidade),
-                data.profile.resumo && React.createElement("p", { className: "text-sm mt-3", style: { ...sans, color: C.text } }, data.profile.resumo)),
-            tiposOrdenados.map((tipo) => (React.createElement(Panel, { key: tipo, style: { marginBottom: 16 } },
-                React.createElement(SectionTitle, null, tipo),
-                React.createElement("div", { className: "flex flex-col gap-3" }, grouped[tipo].map((it) => (React.createElement("div", { key: it.id },
-                    React.createElement("div", { className: "flex justify-between items-start gap-2" },
-                        React.createElement("div", { className: "min-w-0" },
-                            React.createElement("div", { className: "text-sm", style: { ...sans, color: C.text } }, it.titulo),
-                            it.instituicao && React.createElement("div", { className: "text-xs", style: { ...sans, color: C.textMuted } }, it.instituicao),
-                            it.descricao && React.createElement("div", { className: "text-xs mt-1", style: { ...sans, color: C.textMuted } }, it.descricao)),
-                        React.createElement("div", { className: "flex items-center gap-2 shrink-0" },
-                            React.createElement("span", { className: "text-xs", style: { ...sans, color: C.textMuted } }, diplomaMeta(it)),
-                            React.createElement("button", { onClick: () => remove("diplomas", (x) => x.id !== it.id), className: "px-1.5 rounded text-xs no-print", style: { background: "transparent", color: C.danger, border: `1px solid ${C.border}` }, title: "Apagar" }, "\u2715")))))))))),
-            data.skills.length > 0 && (React.createElement(Panel, { style: { marginBottom: 16 } },
-                React.createElement(SectionTitle, null, "Habilidades"),
+        React.createElement("div", { className: "print-area", style: { maxWidth: 680 } },
+            React.createElement("div", { className: "mb-6 pb-4 flex items-center gap-4", style: { borderBottom: `1px solid ${C.border}` } },
+                data.profile.foto
+                    ? React.createElement("img", { src: data.profile.foto, alt: "", className: "rounded-full shrink-0", style: { width: 72, height: 72, objectFit: "cover" } })
+                    : React.createElement("div", { className: "rounded-full shrink-0 flex items-center justify-center", style: { width: 72, height: 72, background: C.surfaceAlt, color: C.textMuted, ...serif, fontSize: 22 } }, (data.profile.nome || "?").split(" ").map((w) => w[0]).slice(0, 2).join("")),
+                React.createElement("div", { className: "min-w-0" },
+                    React.createElement("div", { style: { ...serif, fontSize: 24, color: C.text } }, data.profile.nome || "Seu nome"),
+                    data.profile.cargo && React.createElement("div", { className: "text-sm mt-0.5", style: { ...sans, color: C.sage } }, data.profile.cargo),
+                    React.createElement("div", { className: "text-xs mt-1", style: { ...sans, color: C.textMuted } },
+                        idade !== null && `${idade} anos`,
+                        idade !== null && (data.profile.telefone || data.profile.email) ? " · " : "",
+                        data.profile.telefone,
+                        data.profile.telefone && data.profile.email ? " · " : "",
+                        data.profile.email,
+                        data.profile.cidade ? ` · ${data.profile.cidade}` : ""))),
+            data.profile.objetivo && (React.createElement(ResumeSection, { title: "Objetivo Profissional" },
+                React.createElement("p", { className: "text-sm", style: { ...sans, color: C.text } }, data.profile.objetivo))),
+            SECOES.map((sec) => {
+                if (sec.opcional && !cfgCv.mostrarIdiomas)
+                    return null;
+                const itens = sec.tipos.flatMap((t) => porTipo[t] || []);
+                if (itens.length === 0)
+                    return null;
+                return (React.createElement(ResumeSection, { key: sec.titulo, title: sec.titulo }, ordenarPorData(itens).map((it) => (React.createElement(ResumeItem, { key: it.id, titulo: it.titulo, subtitulo: it.instituicao, meta: diplomaMeta(it), descricao: it.descricao, onDelete: () => remove("diplomas", (x) => x.id !== it.id) })))));
+            }),
+            data.skills.length > 0 && (React.createElement(ResumeSection, { title: "Habilidades" },
                 React.createElement("div", { className: "flex flex-wrap gap-2" }, data.skills.map((s) => (React.createElement("span", { key: s.id, className: "text-xs px-2 py-1 rounded", style: { background: C.surfaceAlt, color: C.text, ...sans } },
                     s.nome,
-                    s.nivel ? ` · ${s.nivel}` : "")))))),
-            React.createElement(Panel, null,
-                React.createElement(SectionTitle, { sub: "N\u00FAmeros acumulados a partir dos seus pr\u00F3prios registros" }, "Forma\u00E7\u00E3o continuada"),
-                React.createElement("div", { className: "grid grid-cols-3 gap-4 text-center" },
-                    React.createElement("div", null,
-                        React.createElement("div", { style: { ...serif, fontSize: 22, color: C.text } },
-                            num(totalHoras),
-                            "h"),
-                        React.createElement("div", { className: "text-xs", style: { ...sans, color: C.textMuted } }, "em cursos")),
-                    React.createElement("div", null,
-                        React.createElement("div", { style: { ...serif, fontSize: 22, color: C.text } }, livrosLidos),
-                        React.createElement("div", { className: "text-xs", style: { ...sans, color: C.textMuted } }, "livros lidos")),
-                    React.createElement("div", null,
-                        React.createElement("div", { style: { ...serif, fontSize: 22, color: C.text } }, data.skills.length),
-                        React.createElement("div", { className: "text-xs", style: { ...sans, color: C.textMuted } }, "habilidades"))))),
-        React.createElement("div", { className: "grid md:grid-cols-2 gap-4 no-print mt-4" },
+                    s.nivel ? ` · ${s.nivel}` : ""))))))),
+        React.createElement("div", { className: "grid md:grid-cols-2 gap-4 no-print mt-6" },
             React.createElement(Panel, null,
                 React.createElement(SectionTitle, null, "Dados pessoais"),
                 React.createElement("form", { onSubmit: saveProfile, className: "flex flex-col gap-3" },
+                    React.createElement("div", null,
+                        React.createElement("label", { className: "text-xs block mb-1", style: { ...sans, color: C.textMuted } }, "Foto (opcional)"),
+                        React.createElement("input", { type: "file", accept: "image/*", onChange: onFotoChange, className: "w-full text-xs", style: { ...sans, color: C.text } })),
                     React.createElement("input", { placeholder: "Nome completo", value: profileEdit.nome || "", onChange: (e) => setProfileEdit({ ...profileEdit, nome: e.target.value }), className: "p-2 rounded", style: inputStyle() }),
                     React.createElement("input", { placeholder: "Cargo ou \u00E1rea (ex: Analista Administrativo)", value: profileEdit.cargo || "", onChange: (e) => setProfileEdit({ ...profileEdit, cargo: e.target.value }), className: "p-2 rounded", style: inputStyle() }),
                     React.createElement("div", null,
@@ -1258,15 +1290,19 @@ function Curriculo({ data, setData }) {
                     React.createElement("input", { placeholder: "Telefone", value: profileEdit.telefone || "", onChange: (e) => setProfileEdit({ ...profileEdit, telefone: e.target.value }), className: "p-2 rounded", style: inputStyle() }),
                     React.createElement("input", { placeholder: "Email", value: profileEdit.email || "", onChange: (e) => setProfileEdit({ ...profileEdit, email: e.target.value }), className: "p-2 rounded", style: inputStyle() }),
                     React.createElement("input", { placeholder: "Cidade / estado", value: profileEdit.cidade || "", onChange: (e) => setProfileEdit({ ...profileEdit, cidade: e.target.value }), className: "p-2 rounded", style: inputStyle() }),
-                    React.createElement("textarea", { placeholder: "Resumo profissional (2 a 3 linhas)", value: profileEdit.resumo || "", onChange: (e) => setProfileEdit({ ...profileEdit, resumo: e.target.value }), rows: 3, className: "p-2 rounded", style: inputStyle() }),
+                    React.createElement("textarea", { placeholder: "Objetivo profissional (2 a 3 linhas)", value: profileEdit.objetivo || "", onChange: (e) => setProfileEdit({ ...profileEdit, objetivo: e.target.value }), rows: 3, className: "p-2 rounded", style: inputStyle() }),
                     React.createElement("button", { type: "submit", className: "rounded py-2", style: { background: C.sage, color: C.bg, ...sans, fontWeight: 500 } }, "Salvar dados"))),
             React.createElement(Panel, null,
-                React.createElement(SectionTitle, null, "Adicionar ao curr\u00EDculo"),
+                React.createElement("div", { className: "flex justify-between items-center mb-3" },
+                    React.createElement(SectionTitle, null, "Adicionar ao curr\u00EDculo"),
+                    React.createElement("label", { className: "text-xs flex items-center gap-1", style: { ...sans, color: C.textMuted } },
+                        React.createElement("input", { type: "checkbox", checked: cfgCv.mostrarIdiomas, onChange: toggleIdiomas }),
+                        " Mostrar se\u00E7\u00E3o de Idiomas")),
                 React.createElement("form", { onSubmit: addItem, className: "flex flex-col gap-3" },
-                    React.createElement("select", { value: form.tipo, onChange: (e) => setForm({ ...form, tipo: e.target.value }), className: "w-full p-2 rounded", style: inputStyle() }, ORDEM.map((t) => React.createElement("option", { key: t }, t))),
+                    React.createElement("select", { value: form.tipo, onChange: (e) => setForm({ ...form, tipo: e.target.value }), className: "w-full p-2 rounded", style: inputStyle() }, ["Experiência", "Formação", "Pós-graduação", "Idioma", "Curso", "Certificado"].map((t) => React.createElement("option", { key: t }, t))),
                     React.createElement("input", { placeholder: form.tipo === "Experiência" ? "Cargo" : "Título", value: form.titulo, onChange: (e) => setForm({ ...form, titulo: e.target.value }), className: "p-2 rounded", style: inputStyle() }),
                     React.createElement("input", { placeholder: form.tipo === "Experiência" ? "Empresa" : "Instituição", value: form.instituicao, onChange: (e) => setForm({ ...form, instituicao: e.target.value }), className: "p-2 rounded", style: inputStyle() }),
-                    React.createElement("textarea", { placeholder: "Descri\u00E7\u00E3o (opcional) \u2014 o que voc\u00EA fez ou aprendeu", value: form.descricao, onChange: (e) => setForm({ ...form, descricao: e.target.value }), rows: 2, className: "p-2 rounded", style: inputStyle() }),
+                    React.createElement("textarea", { placeholder: "Descri\u00E7\u00E3o (opcional)", value: form.descricao, onChange: (e) => setForm({ ...form, descricao: e.target.value }), rows: 2, className: "p-2 rounded", style: inputStyle() }),
                     React.createElement("div", { className: "grid grid-cols-2 gap-3" },
                         React.createElement("div", null,
                             React.createElement("label", { className: "text-xs block mb-1", style: { color: C.textMuted, ...sans } }, "In\u00EDcio"),
@@ -1274,10 +1310,9 @@ function Curriculo({ data, setData }) {
                         React.createElement("div", null,
                             React.createElement("label", { className: "text-xs block mb-1", style: { color: C.textMuted, ...sans } }, "Fim"),
                             React.createElement("input", { type: "date", value: form.dataFim, onChange: (e) => setForm({ ...form, dataFim: e.target.value }), className: "w-full p-2 rounded", style: inputStyle() }))),
-                    !isFormacao && (React.createElement("div", null,
+                    (form.tipo !== "Formação" && form.tipo !== "Pós-graduação" && form.tipo !== "Experiência") && (React.createElement("div", null,
                         React.createElement("label", { className: "text-xs block mb-1", style: { color: C.textMuted, ...sans } }, "Carga hor\u00E1ria (horas)"),
                         React.createElement("input", { type: "text", inputMode: "numeric", value: form.horas, onChange: (e) => setForm({ ...form, horas: e.target.value }), className: "w-full p-2 rounded", style: inputStyle() }))),
-                    isFormacao && React.createElement("p", { className: "text-xs", style: { color: C.textMuted, ...sans } }, "A dura\u00E7\u00E3o em anos \u00E9 calculada a partir das datas."),
                     React.createElement("button", { type: "submit", className: "rounded py-2", style: { background: C.sage, color: C.bg, ...sans, fontWeight: 500 } }, "Adicionar"))))));
 }
 const LANGUAGES = [
@@ -1286,10 +1321,11 @@ const LANGUAGES = [
     { code: "es", label: "Español" },
     { code: "fr", label: "Français" },
 ];
-/* Estado zerado — mantém só o perfil e as preferências do usuário */
+/* Estado zerado — mantém só o perfil, currículo-config e as preferências do usuário */
 function emptyData(current) {
     return {
         dashboardConfig: current.dashboardConfig,
+        curriculoConfig: current.curriculoConfig,
         currency: current.currency || "BRL",
         profile: current.profile,
         books: [], reading: [], studyRecords: [], skills: [],
